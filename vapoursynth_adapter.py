@@ -22,6 +22,7 @@ class FrameProcessor:
         self.count = 0
         self.last = None
         self.owner_managed = "OPENPLAYER_FRAME_ENDPOINT" in os.environ
+        self.planar = self.owner_managed and os.environ.get("OPENPLAYER_PROBE_PLANAR") == "1"
         python = os.environ.get("OPENPLAYER_PROBE_PYTHON")
         if not python:
             raise RuntimeError("OPENPLAYER_PROBE_PYTHON must point to the private Python runtime")
@@ -52,6 +53,8 @@ class FrameProcessor:
         if frame.props.get("_Transfer", 2) in (16, 18):
             raise ValueError("HDR input is not supported by this SDR probe")
         started = time.perf_counter()
+        if self.planar:
+            return self.process_planar(n, frame, started)
         rgba = np.empty((frame.height, frame.width, 4), dtype=np.uint8)
         for channel in range(3):
             rgba[:, :, channel] = np.asarray(frame[channel])
@@ -70,6 +73,30 @@ class FrameProcessor:
         self.log("frame", n=n, reset=reset, mean=float(output[:, :, :3].mean()),
                  changed_mean=float(np.abs(output.astype(np.int16) - rgba.astype(np.int16)).mean()),
                  elapsed_ms=(time.perf_counter() - started) * 1000, fallback=self.session.error)
+        return result
+
+    def process_planar(self, n, frame, started):
+        result = frame.copy()
+        source = [np.asarray(frame[channel]) for channel in range(3)]
+        output = [np.asarray(result[channel]) for channel in range(3)]
+        reset = self.last is None or n != self.last + 1
+        self.session.process_into(source, output, reset=reset)
+        processing_ms = (time.perf_counter() - started) * 1000
+        self.count += 1
+        self.last = n
+        if self.count == 1:
+            from PIL import Image
+            Image.fromarray(np.stack(source, axis=2)).save(self.artifacts / f"{self.id}-input.png")
+            Image.fromarray(np.stack(output, axis=2)).save(self.artifacts / f"{self.id}-output.png")
+        # Diagnostic sampling stays off the full-frame copy path. Presentation
+        # screenshots and transport unit tests still check complete images.
+        samples = [plane[::16, ::16] for plane in output]
+        changes = [np.abs(out.astype(np.int16) - src[::16, ::16].astype(np.int16)).mean()
+                   for out, src in zip(samples, source)]
+        self.log("frame", n=n, reset=reset, mean=float(np.mean([plane.mean() for plane in samples])),
+                 changed_mean=float(np.mean(changes)), pixel_sampling=16,
+                 processing_ms=processing_ms, elapsed_ms=(time.perf_counter() - started) * 1000,
+                 fallback=self.session.error)
         return result
 
     def __del__(self):

@@ -94,6 +94,33 @@ class FrameServiceTests(unittest.TestCase):
         finally:
             owner.close()
 
+    def test_planar_transfer_matches_rgba_and_does_not_mutate_source(self):
+        source = [self.frame[:, :, channel] for channel in range(3)]
+        output = [np.empty_like(plane) for plane in source]
+        with self.service() as owner:
+            with FrameClient(owner.endpoint, 64, 32) as client:
+                self.assertTrue(client.process_into(source, output))
+                expected = self.frame.copy()
+                expected[0, 0, :3] = (100, 1, 200)
+                for channel in range(3):
+                    np.testing.assert_array_equal(output[channel], expected[:, :, channel])
+                    np.testing.assert_array_equal(source[channel], 48)
+                with self.assertRaises(ValueError):
+                    client.process_into(source[:2], output)
+                output[0].flags.writeable = False
+                with self.assertRaises(ValueError):
+                    client.process_into(source, output)
+
+    def test_planar_failure_preserves_every_original_pixel(self):
+        with self.service(options={"mode": "crash"}) as owner:
+            with FrameClient(owner.endpoint, 64, 32) as client:
+                source = [self.frame[:, :, channel] for channel in range(3)]
+                output = [np.zeros_like(plane) for plane in source]
+                for _ in range(2):
+                    self.assertFalse(client.process_into(source, output))
+                    for actual, original in zip(output, source):
+                        np.testing.assert_array_equal(actual, original)
+
 
 if __name__ == "__main__":
     unittest.main()

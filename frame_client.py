@@ -54,8 +54,32 @@ class FrameClient:
             raise ValueError("invalid RGBA8 frame")
         if self.error:
             return frame.copy()
+        np.copyto(self.source, frame)
+        return self.output.copy() if self._evaluate(reset) else frame.copy()
+
+    def process_into(self, source_planes, output_planes, *, reset=False):
+        """Copy RGB planes directly through owned RGBA buffers, without staging arrays."""
+        if self.closed:
+            raise ProcessorError("frame lease is closed")
+        if len(source_planes) != 3 or len(output_planes) != 3:
+            raise ValueError("three RGB planes required")
+        for plane in (*source_planes, *output_planes):
+            if not isinstance(plane, np.ndarray) or plane.dtype != np.uint8 or plane.shape != self.shape[:2]:
+                raise ValueError("invalid RGB plane")
+        if any(not plane.flags.writeable for plane in output_planes):
+            raise ValueError("output planes must be writable")
+        processed = False
+        if not self.error:
+            for channel, plane in enumerate(source_planes):
+                np.copyto(self.source[:, :, channel], plane)
+            self.source[:, :, 3] = 255
+            processed = self._evaluate(reset)
+        for channel, plane in enumerate(output_planes):
+            np.copyto(plane, self.output[:, :, channel] if processed else source_planes[channel])
+        return processed
+
+    def _evaluate(self, reset):
         try:
-            np.copyto(self.source, frame)
             self.sequence += 1
             send_message(self.connection, {"op": "process", "generation": self.generation,
                                            "sequence": self.sequence, "reset": bool(reset)})
@@ -65,11 +89,11 @@ class FrameClient:
                 raise ProcessorError("stale or invalid frame reply")
             if not reply["processed"]:
                 raise ProcessorError(reply.get("fallback") or "frame processor failed")
-            return self.output.copy()
+            return True
         except (OSError, EOFError, ValueError, ProcessorError) as error:
             self.error = str(error)
             self.connection.close()
-            return frame.copy()
+            return False
 
     def close(self):
         self.source = self.output = None

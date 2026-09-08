@@ -82,6 +82,25 @@ cleanup evidence. `git diff --check` passed. No installer or release was built.
 
 ## Next integration boundary
 
+### Planar transport follow-up
+
+`--persistent --planar` now writes decoded RGB planes straight into the owner's
+RGBA input mapping and copies output planes straight back to the writable VS
+frame. It avoids per-frame RGBA staging/output arrays. Pixel diagnostics sample
+every 16th row/column; initial PNGs and the presentation screenshot remain full
+resolution. This is both a transfer optimization and reduced diagnostic work,
+not a claim that every pixel is checked on every frame.
+
+Window evidence `.local/planar-window-720p.json` recorded 118 frames, one engine,
+zero fallback, warm callback mean/p95 19.92/22.13 ms and successful Alt+F4 close.
+`.local/planar-window-1080p.json` recorded 92 frames, one engine, zero fallback,
+34.45/39.26 ms and successful window/teardown checks. Timing excludes decode,
+surrounding YUV conversion and presentation; sustained A/V playback is still
+unverified. All 28 unit tests passed, including full-image planar/RGBA equivalence,
+source immutability, non-contiguous planes and exact failure pass-through.
+
+### Remaining host integration
+
 The owner is currently supplied by the developer launcher, not the player's
 native module registry. Package verification/consent, disable/update/uninstall
 ownership, private runtime deployment and a real plugin UI are still required.

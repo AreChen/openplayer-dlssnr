@@ -21,6 +21,7 @@ def main():
     parser.add_argument("--verify-frames", action="store_true")
     parser.add_argument("--expect-fallback", action="store_true")
     parser.add_argument("--persistent", action="store_true", help="use an owner-scoped engine across filter rebuilds")
+    parser.add_argument("--planar", action="store_true", help="use direct RGB planes and sampled pixel diagnostics")
     parser.add_argument("--timeout", type=float, default=20)
     parser.add_argument("--report", type=Path, required=True)
     args = parser.parse_args()
@@ -28,11 +29,14 @@ def main():
         parser.error("timeout must be (0,60], report must not exist")
     if args.persistent and args.script.name not in ("dlssnr.vpy", "dlssnr-crash.vpy"):
         parser.error("persistent probe requires a known DLSSNR fixture")
+    if args.planar and not args.persistent:
+        parser.error("planar transfer requires --persistent")
     env = dict(os.environ)
     env["APPDATA"] = str(root / ".local/vs-config")
     env["VSSCRIPT_PATH"] = str(root / ".local/python/vapoursynth/vsscript.dll")
     env["PYTHONPATH"] = str(root / ".local/python") + os.pathsep + str(root)
     env["OPENPLAYER_PROBE_PYTHON"] = sys.executable
+    env["OPENPLAYER_PROBE_PLANAR"] = "1" if args.planar else "0"
     artifacts = args.report.resolve().with_suffix(".frames")
     if artifacts.exists():
         parser.error("artifact directory must not exist")
