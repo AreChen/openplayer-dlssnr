@@ -1,9 +1,10 @@
 # OpenPlayer DLSSNR prototype
 
 Independent, Windows-only experiment for processing SDR video frames with
-DLSSNR. **This is not an installable `.opplugin`, and it does not enhance live
-OpenPlayer playback yet.** No OpenPlayer source, window hierarchy, SDK permission,
-registry setting, or installed player binary is changed by this project.
+DLSSNR. **This is not an installable `.opplugin`.** Real decoded frames now pass
+through DLSSNR inside OpenPlayer's opt-in native window smoke harness. The normal
+player does not expose this adapter. No installed binary, registry setting, user
+database, or window hierarchy is changed.
 
 ## What works
 
@@ -12,6 +13,7 @@ registry setting, or installed player binary is changed by this project.
 - Frames retain submission order; the first frame, explicit discontinuities, and parameter updates reset temporal history.
 - Evaluation failure, worker crash, or timeout disables the worker and passes subsequent original frames through. Startup failures raise explicitly; the caller must retain its original video path.
 - A CLI accepts an image or short SDR video and generates metrics, PNG comparisons, and an optional silent side-by-side MP4.
+- A native libmpv probe and a test-only OpenPlayer adapter exercise live frame reinsertion, pause, seek, filter detach/reattach, resize, fullscreen and close without hiding the overlay.
 
 This prototype uses CPU frame buffers with GPU upload/readback, **not zero-copy
 GPU textures**. It is single-caller, synchronous, limited to 1920x1080 and one
@@ -25,7 +27,7 @@ environment, not OpenPlayer or a shared system Python installation:
 
 ```powershell
 rtk proxy git submodule update --init --recursive
-rtk proxy py -3.13 -m venv .venv
+rtk proxy py -3.12 -m venv .venv
 rtk proxy .venv/Scripts/python.exe -m pip install -r requirements.txt
 rtk proxy .venv/Scripts/python.exe -m unittest discover -s tests -v
 ```
@@ -68,6 +70,13 @@ runtime/host hashes, reset indices, fallback count, and worker exit status.
 Timing excludes decode, encode, audio synchronization, and player presentation.
 Nonzero output and pixel differences establish execution, not improved quality.
 
+## Test the playback adapter
+
+See [native playback verification](docs/native-playback-probe.md) for prerequisites,
+reproduction commands, measured limits, and the difference between a smoke harness
+and an installable plugin. The 720p test passed controls/lifecycle checks; the
+1080p CPU-buffer path is too slow for stable 24 FPS on the tested machine.
+
 ## Scope and next gate
 
 See [the measured results and integration gate](docs/2026-09-08-validation.md).
@@ -76,13 +85,14 @@ Current OpenPlayer SDK UI, settings, and storage can be reused eventually, but i
 safe JS filter API does not allow native processors. No fictitious SDK method or
 nonfunctional plugin manifest is shipped here.
 
-The shipped libmpv recognizes `vapoursynth`; a private-runtime passthrough probe
-played video but hung during teardown in the Python/ctypes test environment.
-The root cause is not established, and this does **not** prove OpenPlayer itself
-would hang. This path is not approved for host integration on that evidence.
+The initial Python/ctypes teardown hang was not reproduced in the native C++
+probe or the real OpenPlayer window harness. Its original root cause remains
+unresolved. These tests use a private VapourSynth/Python runtime, and execute the
+trusted adapter in the player process; only the NGX engine is isolated in a worker.
 
 Do not add window capture/reparenting, a replacement renderer, arbitrary Python
 execution permissions, or large native plugin infrastructure to make this test
-look integrated. First establish a bounded, lifecycle-safe native filter adapter
-that preserves existing decoding/presentation and the controls overlay. If it
-requires substantial host complexity, keep this an independent/offline experiment.
+look integrated. Before publishing a plugin, solve runtime deployment, integration
+with host-owned native lifecycle/consent, costly seek reinitialization and realtime
+performance. UI and presets can then reuse existing SDK primitives. If production
+integration requires substantial host complexity, keep this experimental.

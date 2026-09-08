@@ -1,5 +1,10 @@
 # DLSSNR validation - 2026-09-08
 
+This records the initial offline experiment. The subsequent native-frame and
+OpenPlayer window tests are documented in [native playback verification](native-playback-probe.md).
+That follow-up supersedes the original live-reinsertion gate below; it still does
+not provide an installable plugin.
+
 ## Result and boundary
 
 Real DLSSNR inference succeeds outside OpenPlayer using the existing local
