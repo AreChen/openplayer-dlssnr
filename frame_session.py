@@ -132,18 +132,36 @@ class FrameSession:
                 raise ProcessorError(self.error)
             self.fallback_frames += 1
             return frame.copy()
+        np.copyto(self._source, frame)
+        if self.process_shared(reset=reset):
+            return self._output.copy()
+        return frame.copy()
+
+    def process_shared(self, *, reset=False):
+        """Evaluate the owned input buffer, for a trusted single-caller transport.
+
+        The caller must finish writing input before this call and finish reading
+        output before the next call. False means use the original, not output.
+        Buffer mappings remain valid until close(), including after worker failure.
+        """
+        if self.closed:
+            raise ProcessorError("frame session is closed")
+        if self.error:
+            if not self.fallback:
+                raise ProcessorError(self.error)
+            self.fallback_frames += 1
+            return False
         try:
-            np.copyto(self._source, frame)
             self._request({"op": "process", "reset": bool(reset or self._reset)})
             self._reset = False
-            return self._output.copy()
+            return True
         except ProcessorError as error:
             self.error = str(error)
-            self._dispose()
+            self._dispose(keep_buffers=True)
             if not self.fallback:
                 raise
             self.fallback_frames += 1
-            return frame.copy()
+            return False
 
     def update(self, settings):
         if self.closed or self.error:
@@ -153,10 +171,10 @@ class FrameSession:
             self._reset = True
         except ProcessorError as error:
             self.error = str(error)
-            self._dispose()
+            self._dispose(keep_buffers=True)
             raise
 
-    def _dispose(self):
+    def _dispose(self, *, keep_buffers=False):
         process = self._process
         if process is not None:
             if process.pid is not None:
@@ -180,6 +198,8 @@ class FrameSession:
         if self._connection is not None:
             self._connection.close()
             self._connection = None
+        if keep_buffers:
+            return
         self._source = self._output = None
         for memory in self._memories:
             memory.close()

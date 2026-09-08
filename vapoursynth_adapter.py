@@ -10,6 +10,7 @@ import vapoursynth as vs
 
 from dlssnr_backend import DlssnrProcessor
 from frame_session import FrameSession
+from frame_client import FrameClient
 
 
 class FrameProcessor:
@@ -20,18 +21,27 @@ class FrameProcessor:
         self.id = f"{os.getpid()}-{time.time_ns()}"
         self.count = 0
         self.last = None
+        self.owner_managed = "OPENPLAYER_FRAME_ENDPOINT" in os.environ
         python = os.environ.get("OPENPLAYER_PROBE_PYTHON")
         if not python:
             raise RuntimeError("OPENPLAYER_PROBE_PYTHON must point to the private Python runtime")
         multiprocessing.set_executable(python)
-        self.session = FrameSession(width, height, factory, {
+        options = {
             "host": str(root / ".local/build/dlssnr_host_v2.dll"),
             "runtime": str(root / ".local/runtime/nvngx_dlssnr.dll"),
             "log": str(self.artifacts / f"{self.id}-native.log"),
             "settings": {"intensity": 0.5},
-        }, timeout=0.5, startup_timeout=15)
+        }
+        if self.owner_managed:
+            self.session = FrameClient(json.loads(os.environ["OPENPLAYER_FRAME_ENDPOINT"]), width, height)
+        else:
+            self.session = FrameSession(width, height, factory, options, timeout=0.5, startup_timeout=15)
         self.log("start", width=width, height=height, worker_pid=self.session.worker_pid,
-                 startup_ms=self.session.startup_ms)
+                 startup_ms=self.session.startup_ms, owner_managed=self.owner_managed,
+                 generation=getattr(self.session, "generation", None),
+                 engine=getattr(self.session, "engine", None),
+                 reused=getattr(self.session, "reused", False),
+                 attach_ms=getattr(self.session, "attach_ms", self.session.startup_ms))
 
     def log(self, event, **fields):
         with (self.artifacts / "events.jsonl").open("a", encoding="utf-8") as out:
@@ -66,7 +76,8 @@ class FrameProcessor:
         try:
             if self.session is not None:
                 self.session.close()
-                self.log("close", frames=self.count, worker_exitcode=self.session.worker_exitcode)
+                self.log("close", frames=self.count, worker_exitcode=self.session.worker_exitcode,
+                         owner_managed=self.owner_managed)
         except Exception:
             # Teardown must not raise into the filter engine during unwinding.
             pass

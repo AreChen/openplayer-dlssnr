@@ -1,5 +1,9 @@
 # Native playback verification
 
+This is the baseline per-filter-worker test. The subsequent
+[persistent-owner step](persistent-frame-owner.md) adds measured engine reuse
+across seeks without changing the normal player or publishing an SDK attachment.
+
 ## Result and boundary
 
 Real DLSSNR-processed frames were returned to OpenPlayer's existing libmpv video
@@ -59,7 +63,7 @@ Findings linked to evidence:
 - `.local/window-dlssnr-crash-720p.json`: the worker deliberately exited with code 89 on its fifth frame. Each session processed four frames first, then returned unchanged original RGB frames. Pause/seek, window operations and teardown still passed. The fault is selected only by a dedicated test fixture.
 - `.local/native-dlssnr-crash-720p.json`: the standalone native probe also passed stop/reload and `mpv_terminate_destroy` after faults, with 78 original-frame fallbacks among 94 frames.
 
-Session startup was approximately 1.1 seconds. Seek currently rebuilds the
+In this baseline, session startup was approximately 1.1 seconds. Seek rebuilds the
 VapourSynth session and its NGX worker, causing a visible initialization delay.
 No A/V sync, HDR, 10-bit color, device loss, long playback, interpolation or
 upscaling was validated. Conversion is explicitly 8-bit limited-range BT.709;
@@ -122,7 +126,7 @@ directories are never overwritten. Reports include process status and frame
 evidence; missing close events, black output, unchanged healthy frames or an
 unexpected fallback make the command fail even when the executable exits 0.
 
-Fourteen GPU-independent unit tests cover the transport, watchdog and evidence
+Fourteen GPU-independent unit tests covered the baseline transport, watchdog and evidence
 validator. Host Rust tests, strict Clippy with `window-smoke`, shell architecture
 checks and frontend build were also verified for this change.
 

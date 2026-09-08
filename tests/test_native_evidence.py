@@ -54,6 +54,29 @@ class EvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "preserve"):
             analyze_events(self.events, expect_fallback=True)
 
+    def owner_evidence(self):
+        self.events[0].update(owner_managed=True, engine=1, generation=1, reused=False, attach_ms=100)
+        self.events[-1].update(owner_managed=True, worker_exitcode=None)
+        return [
+            {"event": "engine-start", "engine": 1, "worker_pid": 123},
+            {"event": "attach", "engine": 1, "generation": 1, "worker_pid": 123},
+            {"event": "detach", "engine": 1, "generation": 1},
+            {"event": "engine-close", "engine": 1, "worker_pid": 123, "worker_exitcode": 0},
+        ]
+
+    def test_owner_cleanup_is_required_separately_from_filter_close(self):
+        owner = self.owner_evidence()
+        self.assertEqual(analyze_events(self.events, owner_events=owner)["engines"], 1)
+        for broken in (None, owner[:-1], owner[:2] + owner[3:]):
+            with self.subTest(owner=broken), self.assertRaises(ValueError):
+                analyze_events(self.events, owner_events=broken)
+
+    def test_owner_cannot_substitute_another_worker(self):
+        owner = self.owner_evidence()
+        owner[-1]["worker_pid"] = 999
+        with self.assertRaisesRegex(ValueError, "PID mismatch"):
+            analyze_events(self.events, owner_events=owner)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -14,6 +14,7 @@ database, or window hierarchy is changed.
 - Evaluation failure, worker crash, or timeout disables the worker and passes subsequent original frames through. Startup failures raise explicitly; the caller must retain its original video path.
 - A CLI accepts an image or short SDR video and generates metrics, PNG comparisons, and an optional silent side-by-side MP4.
 - A native libmpv probe and a test-only OpenPlayer adapter exercise live frame reinsertion, pause, seek, filter detach/reattach, resize, fullscreen and close without hiding the overlay.
+- An opt-in owner-scoped frame service reuses one engine across filter rebuilds, resets temporal history for every new lease, and releases it when the owner closes.
 
 This prototype uses CPU frame buffers with GPU upload/readback, **not zero-copy
 GPU textures**. It is single-caller, synchronous, limited to 1920x1080 and one
@@ -77,6 +78,11 @@ reproduction commands, measured limits, and the difference between a smoke harne
 and an installable plugin. The 720p test passed controls/lifecycle checks; the
 1080p CPU-buffer path is too slow for stable 24 FPS on the tested machine.
 
+[Persistent frame ownership](docs/persistent-frame-owner.md) adds `--persistent`
+to the same probe. Real 720p window tests reused one worker through seek and
+detach/reattach; reconnect took about 1-11 ms instead of reinitializing the engine.
+This measures the connection, not complete seek-to-display latency.
+
 ## Scope and next gate
 
 See [the measured results and integration gate](docs/2026-09-08-validation.md).
@@ -93,6 +99,7 @@ trusted adapter in the player process; only the NGX engine is isolated in a work
 Do not add window capture/reparenting, a replacement renderer, arbitrary Python
 execution permissions, or large native plugin infrastructure to make this test
 look integrated. Before publishing a plugin, solve runtime deployment, integration
-with host-owned native lifecycle/consent, costly seek reinitialization and realtime
-performance. UI and presets can then reuse existing SDK primitives. If production
+with host-owned native lifecycle/consent and realtime performance. The experimental
+owner resolves engine reinitialization on same-format seeks, but is not connected
+to the SDK registry yet. UI and presets can then reuse existing SDK primitives. If production
 integration requires substantial host complexity, keep this experimental.

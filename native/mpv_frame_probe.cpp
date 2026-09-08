@@ -32,8 +32,9 @@ int wmain(int argc, wchar_t** argv) {
     limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
     if (!job || !SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof(limits))
         || !AssignProcessToJobObject(job, GetCurrentProcess())) return 3;
-    if (!std::wcscmp(argv[1], L"--run")) {
-        if (std::wcscmp(argv[3], L"main") && std::wcscmp(argv[3], L"overlay")
+    const bool ownedRun = !std::wcscmp(argv[1], L"--owned-run");
+    if (ownedRun || !std::wcscmp(argv[1], L"--run")) {
+        if (!ownedRun && std::wcscmp(argv[3], L"main") && std::wcscmp(argv[3], L"overlay")
             && std::wcscmp(argv[3], L"overlay-alt-f4")) return 2;
         STARTUPINFOW startup{}; startup.cb = sizeof(startup);
         startup.dwFlags = STARTF_USESTDHANDLES;
@@ -41,7 +42,7 @@ int wmain(int argc, wchar_t** argv) {
         startup.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
         startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
         PROCESS_INFORMATION child{};
-        std::wstring line = L"\"" + std::wstring(argv[2]) + L"\" " + argv[3];
+        std::wstring line = L"\"" + std::wstring(argv[2]) + L"\" \"" + argv[3] + L"\"";
         if (!CreateProcessW(argv[2], line.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
             nullptr, nullptr, &startup, &child)) return 7;
         CloseHandle(child.hThread);

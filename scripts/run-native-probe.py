@@ -20,11 +20,14 @@ def main():
     parser.add_argument("--close-target", choices=("main", "overlay", "overlay-alt-f4"), default="overlay")
     parser.add_argument("--verify-frames", action="store_true")
     parser.add_argument("--expect-fallback", action="store_true")
+    parser.add_argument("--persistent", action="store_true", help="use an owner-scoped engine across filter rebuilds")
     parser.add_argument("--timeout", type=float, default=20)
     parser.add_argument("--report", type=Path, required=True)
     args = parser.parse_args()
     if not 0 < args.timeout <= 60 or args.report.exists():
         parser.error("timeout must be (0,60], report must not exist")
+    if args.persistent and args.script.name not in ("dlssnr.vpy", "dlssnr-crash.vpy"):
+        parser.error("persistent probe requires a known DLSSNR fixture")
     env = dict(os.environ)
     env["APPDATA"] = str(root / ".local/vs-config")
     env["VSSCRIPT_PATH"] = str(root / ".local/python/vapoursynth/vsscript.dll")
@@ -42,6 +45,10 @@ def main():
         env["OPENPLAYER_SMOKE_MEDIA"] = str(args.video.resolve(strict=True))
         env["OPENPLAYER_SMOKE_NATIVE_FILTER"] = str(args.script.resolve(strict=True))
         env["OPENPLAYER_SMOKE_SCREENSHOT"] = str(artifacts / "presented.png")
+    if args.persistent:
+        env["OPENPLAYER_PROBE_COMMAND"] = json.dumps(command)
+        env["OPENPLAYER_PROBE_FACTORY"] = "crash" if args.script.name == "dlssnr-crash.vpy" else "dlssnr"
+        command = [command[0], "--owned-run", sys.executable, str(root / "scripts/owned_native_probe.py")]
     try:
         # The official config helper writes only under this child's private APPDATA.
         configured = subprocess.run(
@@ -59,10 +66,13 @@ def main():
     report = {"command": command, "exit_code": code, "timed_out": code == 124,
               "stdout": stdout.decode("utf-8", errors="replace"),
               "stderr": stderr.decode("utf-8", errors="replace")}
+    if args.persistent:
+        report["playback_command"] = json.loads(env["OPENPLAYER_PROBE_COMMAND"])
     if args.verify_frames or args.expect_fallback or args.script.name == "dlssnr.vpy":
         try:
             report["frame_evidence"] = verify_artifacts(
-                artifacts, window=bool(args.window_smoke), expect_fallback=args.expect_fallback)
+                artifacts, window=bool(args.window_smoke), expect_fallback=args.expect_fallback,
+                expect_reuse=args.persistent)
             report["evidence_passed"] = True
         except (OSError, ValueError, KeyError, TypeError) as error:
             report["evidence_passed"] = False

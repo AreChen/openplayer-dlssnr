@@ -1,0 +1,99 @@
+import multiprocessing as mp
+from multiprocessing.shared_memory import SharedMemory
+import unittest
+
+import numpy as np
+
+from frame_client import FrameClient
+from frame_service import FrameService
+from frame_session import ProcessorError
+from frame_wire import receive_message, send_message
+from test_session import FakeProcessor
+
+
+class FrameServiceTests(unittest.TestCase):
+    def setUp(self):
+        self.frame = np.full((32, 64, 4), 48, np.uint8)
+        self.events = []
+
+    def service(self, **kwargs):
+        return FrameService(FakeProcessor, log=lambda kind, **data: self.events.append((kind, data)), **kwargs)
+
+    def test_rebuild_reuses_engine_and_resets_history(self):
+        with self.service() as owner:
+            with FrameClient(owner.endpoint, 64, 32) as first:
+                pid = first.worker_pid
+                names = [memory.name for memory in first.memories]
+                np.testing.assert_array_equal(first.process(self.frame)[0, 0, :3], [100, 1, 200])
+                np.testing.assert_array_equal(first.process(self.frame)[0, 0, :3], [100, 0, 200])
+            with FrameClient(owner.endpoint, 64, 32) as rebuilt:
+                self.assertEqual(rebuilt.worker_pid, pid)
+                self.assertTrue(rebuilt.reused)
+                self.assertEqual(rebuilt.generation, 2)
+                self.assertEqual(rebuilt.startup_ms, 0)
+                np.testing.assert_array_equal(rebuilt.process(self.frame)[0, 0, :3], [100, 1, 200])
+        self.assertFalse(any(process.pid == pid for process in mp.active_children()))
+        for name in names:
+            with self.assertRaises(FileNotFoundError):
+                SharedMemory(name=name)
+        self.assertEqual([event[0] for event in self.events].count("engine-start"), 1)
+        self.assertEqual([event[0] for event in self.events].count("engine-close"), 1)
+
+    def test_format_change_replaces_instead_of_accumulating_workers(self):
+        with self.service() as owner:
+            for width in (64, 80, 64):
+                with FrameClient(owner.endpoint, width, 32) as client:
+                    self.assertFalse(client.reused)
+                    client.process(np.full((32, width, 4), 48, np.uint8))
+        kinds = [event[0] for event in self.events]
+        self.assertEqual(kinds.count("engine-start"), 3)
+        self.assertEqual(kinds.count("engine-close"), 3)
+
+    def test_failed_worker_is_not_silently_restarted_on_reconnect(self):
+        with self.service(options={"mode": "crash"}) as owner:
+            with FrameClient(owner.endpoint, 64, 32) as first:
+                pid = first.worker_pid
+                np.testing.assert_array_equal(first.process(self.frame), self.frame)
+                self.assertTrue(first.error)
+            with FrameClient(owner.endpoint, 64, 32) as second:
+                self.assertEqual(second.worker_pid, pid)
+                self.assertTrue(second.reused)
+                np.testing.assert_array_equal(second.process(self.frame), self.frame)
+                self.assertTrue(second.error)
+        self.assertEqual([event[0] for event in self.events].count("engine-start"), 1)
+
+    def test_bad_token_does_not_start_worker(self):
+        with self.service() as owner:
+            for token in ("invalid", "\u4e2d", None):
+                with self.subTest(token=token), self.assertRaisesRegex(ProcessorError, "token"):
+                    FrameClient({**owner.endpoint, "token": token}, 64, 32)
+            self.assertIsNone(owner.session)
+
+    def test_timeout_disables_worker_without_stale_output(self):
+        with self.service(options={"mode": "hang"}, timeout=.1) as owner:
+            with FrameClient(owner.endpoint, 64, 32) as client:
+                np.testing.assert_array_equal(client.process(self.frame), self.frame)
+                self.assertIn("timed out", client.error)
+                np.testing.assert_array_equal(client.process(self.frame), self.frame)
+
+    def test_old_generation_cannot_evaluate(self):
+        with self.service() as owner:
+            with FrameClient(owner.endpoint, 64, 32) as client:
+                send_message(client.connection, {"op": "process", "generation": 0,
+                                                 "sequence": 1, "reset": False})
+                self.assertIn("stale", receive_message(client.connection, 2)["error"])
+
+    def test_owner_close_with_active_lease_falls_back(self):
+        owner = self.service()
+        try:
+            with FrameClient(owner.endpoint, 64, 32) as client:
+                client.process(self.frame)
+                owner.close()
+                np.testing.assert_array_equal(client.process(self.frame), self.frame)
+                self.assertTrue(client.error)
+        finally:
+            owner.close()
+
+
+if __name__ == "__main__":
+    unittest.main()
