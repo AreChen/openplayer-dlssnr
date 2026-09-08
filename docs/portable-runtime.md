@@ -95,12 +95,19 @@ passed 37 tests; host regressions passed 196 with three opt-in tests ignored.
 
 ## Next boundary
 
+The subsequent host-owned runtime step is implemented in the Windows developer
+window harness. Rebuild with the current builder for inventory schema 2 (generic
+`metadata` plus the file inventory), then use `scripts/verify-host-runtime.py` to
+exercise cache-copy loading, same-process reuse, conflict rejection and next-run
+stale cleanup. Host details and reproduction are in the sibling repository's
+`docs/plugins/native-runtime-ownership.md`. This does not expose public attachment.
+
 Private runtime discovery is now demonstrated without global configuration, but
 production live attachment is still absent. VSScript and embedded Python maintain
 process-global state: preloading directly from an installed plugin would keep its
 DLLs resident in the player and interfere with uninstall/update. The next host
-step must own an immutable runtime copy and its process lifetime, reject runtime
-conflicts, and detach active video processing before plugin cleanup. Bounded
+step now owns the runtime copy/lifetime and rejects conflicts in the developer
+harness, but must still detach active video processing before plugin cleanup. Bounded
 file-delete retries do not solve DLLs deliberately kept loaded in the host.
 
 Keep `native.video.validatePlan` non-executable until that lifecycle and a real

@@ -99,8 +99,8 @@ def stage(output, vapoursynth, host):
             with path.open("rb") as stream:
                 inventory[path.relative_to(output).as_posix()] = {
                     "size": path.stat().st_size, "sha256": hashlib.file_digest(stream, "sha256").hexdigest()}
-    report = {"schema": 1, "python": sys.version.split()[0], "numpy": numpy.__version__,
-              "nvidiaRuntimeBundled": False, "files": inventory}
+    report = {"schema": 2, "metadata": {"python": sys.version.split()[0], "numpy": numpy.__version__,
+                                       "nvidiaRuntimeBundled": False}, "files": inventory}
     (output / "bundle-inventory.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     files = [path for path in output.rglob("*") if path.is_file()]
     size = sum(path.stat().st_size for path in files)

@@ -17,6 +17,7 @@ database, or window hierarchy is changed.
 - An opt-in owner-scoped frame service reuses one engine across filter rebuilds, resets temporal history for every new lease, and releases it when the owner closes.
 - A native-v1 frame owner module uses the existing SDK control protocol; a separate opt-in host test verifies real NGX worker cleanup on plugin disable, upgrade and uninstall.
 - A relocatable private runtime can be staged and verified through real host package import, without global Python or VapourSynth configuration. See [portable runtime deployment](docs/portable-runtime.md); no playback UI or public attachment is included yet.
+- The Windows host harness now loads a verified private copy, reuses one resident runtime, rejects conflicts and reclaims stale copies on the next run. `scripts/verify-host-runtime.py` checks this in two real window runs; normal-player plugin attachment is still absent.
 
 This prototype uses CPU frame buffers with GPU upload/readback, **not zero-copy
 GPU textures**. It is single-caller, synchronous, limited to 1920x1080 and one
