@@ -5,6 +5,10 @@ owns a persistent frame service. **It is developer source, not an installable
 plugin or a public live-video attachment.** The normal player still cannot attach
 this processor. No proprietary runtime is bundled.
 
+The subsequent [portable runtime step](portable-runtime.md) adds a relocatable
+packaged entry point and real package-import coverage. The explicit-path command
+and placeholder-fixture test below remain useful as the earlier control baseline.
+
 ## Control the owner
 
 The executable runs with fixed local arguments:

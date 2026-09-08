@@ -52,6 +52,15 @@ int wmain(int argc, wchar_t** argv) {
         CloseHandle(child.hProcess);
         return static_cast<int>(exitCode);
     }
+    // Developer-only explicit preload: no environment or DLL search path changes.
+    // Keep VSScript loaded until process exit; its Python globals cannot safely
+    // unload/reinitialize during playback. Production must own this lifetime.
+    if (argc > 5) {
+        if (!LoadLibraryExW(argv[5], nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32)) {
+            std::fprintf(stderr, "portable VSScript preload failed: %lu\n", GetLastError());
+            return 9;
+        }
+    }
     auto dll = LoadLibraryW(argv[1]);
     if (!dll) { std::fprintf(stderr, "LoadLibrary failed: %lu\n", GetLastError()); return 4; }
     try {
