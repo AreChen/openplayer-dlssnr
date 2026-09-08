@@ -101,9 +101,11 @@ source immutability, non-contiguous planes and exact failure pass-through.
 
 ### Remaining host integration
 
-The owner is currently supplied by the developer launcher, not the player's
-native module registry. Package verification/consent, disable/update/uninstall
-ownership, private runtime deployment and a real plugin UI are still required.
+The playback probe's owner is still supplied by the developer launcher. A separate
+[native frame module](native-frame-module.md) now connects the owner to the
+existing native control protocol and verifies real registry/store cleanup on
+disable/update/uninstall. Package deployment, interactive consent, public playback
+attachment and a real plugin UI are still required.
 Keep the public video-plan validator non-executable until that boundary exists.
 This step adds no interpolation, super-resolution engine or arbitrary Python SDK
 permission. Existing normal-player controls and persistence stay unchanged.

@@ -15,6 +15,7 @@ database, or window hierarchy is changed.
 - A CLI accepts an image or short SDR video and generates metrics, PNG comparisons, and an optional silent side-by-side MP4.
 - A native libmpv probe and a test-only OpenPlayer adapter exercise live frame reinsertion, pause, seek, filter detach/reattach, resize, fullscreen and close without hiding the overlay.
 - An opt-in owner-scoped frame service reuses one engine across filter rebuilds, resets temporal history for every new lease, and releases it when the owner closes.
+- A native-v1 frame owner module uses the existing SDK control protocol; a separate opt-in host test verifies real NGX worker cleanup on plugin disable, upgrade and uninstall.
 
 This prototype uses CPU frame buffers with GPU upload/readback, **not zero-copy
 GPU textures**. It is single-caller, synchronous, limited to 1920x1080 and one
@@ -75,8 +76,9 @@ Nonzero output and pixel differences establish execution, not improved quality.
 
 See [native playback verification](docs/native-playback-probe.md) for prerequisites,
 reproduction commands, measured limits, and the difference between a smoke harness
-and an installable plugin. The 720p test passed controls/lifecycle checks; the
-1080p CPU-buffer path is too slow for stable 24 FPS on the tested machine.
+and an installable plugin. The original 1080p CPU-buffer baseline was too slow
+for 24 FPS. The opt-in planar path reduced warm callbacks to about 34.4 ms, but
+does not establish sustained decode/presentation throughput or A/V sync.
 
 [Persistent frame ownership](docs/persistent-frame-owner.md) adds `--persistent`
 to the same probe. Real 720p window tests reused one worker through seek and
@@ -100,6 +102,8 @@ Do not add window capture/reparenting, a replacement renderer, arbitrary Python
 execution permissions, or large native plugin infrastructure to make this test
 look integrated. Before publishing a plugin, solve runtime deployment, integration
 with host-owned native lifecycle/consent and realtime performance. The experimental
-owner resolves engine reinitialization on same-format seeks, but is not connected
-to the SDK registry yet. UI and presets can then reuse existing SDK primitives. If production
+owner resolves engine reinitialization on same-format seeks. Its
+[native control module](docs/native-frame-module.md) now has real SDK registry
+cleanup coverage, but playback attachment remains test-only. UI and presets can
+then reuse existing SDK primitives. If production
 integration requires substantial host complexity, keep this experimental.

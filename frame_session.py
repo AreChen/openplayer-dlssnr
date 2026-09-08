@@ -8,6 +8,8 @@ import math
 import multiprocessing as mp
 from multiprocessing.shared_memory import SharedMemory
 import time
+import os
+import sys
 
 import numpy as np
 
@@ -19,6 +21,9 @@ class ProcessorError(RuntimeError):
 def _worker(connection, names, shape, factory, options):
     memories = []
     try:
+        # Native/Python processor diagnostics must not corrupt the owner's SDK stdout.
+        if sys.stdout is not None and sys.stderr is not None:
+            os.dup2(sys.stderr.fileno(), sys.stdout.fileno())
         for name in names:
             memories.append(SharedMemory(name=name))
         source, output = [np.ndarray(shape, np.uint8, buffer=m.buf) for m in memories]
