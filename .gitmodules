@@ -1,0 +1,3 @@
+[submodule "third_party/DLSS5Tool"]
+	path = third_party/DLSS5Tool
+	url = https://github.com/banbanzhige/DLSS5Tool.git

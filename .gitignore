@@ -1,0 +1,9 @@
+.local/
+__pycache__/
+*.pyc
+.venv/
+*.dll
+*.lib
+*.exp
+*.pdb
+*.obj
