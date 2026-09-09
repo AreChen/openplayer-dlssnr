@@ -28,6 +28,7 @@ class FrameService:
         self.error = None
         self.lock = threading.RLock()
         self.revision = 0
+        self.processed_frames = 0
         self.stopping = threading.Event()
         self.connection = None
         self.listener = socket.socket()
@@ -96,6 +97,7 @@ class FrameService:
                 sequence += 1
                 with self.lock:
                     processed = self.session.process_shared(reset=reset)
+                    self.processed_frames += int(processed)
                 send_message(connection, {"generation": self.generation, "sequence": sequence,
                                            "processed": processed, "fallback": self.session.error})
         finally:

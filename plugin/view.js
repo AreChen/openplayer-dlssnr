@@ -5,6 +5,7 @@
     close: "关闭", gpu: "处理显卡", loading: "正在检测显卡…", retry: "重试检测", detectionFailed: "显卡检测失败", runtime: "NR 运行时 DLL", browse: "选择 DLL 所在目录",
     style: "风格", standard: "默认", natural: "自然", cinema: "电影", local_tone: "局部色调", local_struct: "局部结构",
     skin_struct: "肤色结构", use_auto_mask: "自动肤色蒙版", applied: "参数已应用",
+    frameRate: "增强帧率上限", sourceRate: "原始帧率",
     sdr: "兼容模式：HDR / 杜比视界转 SDR", output: "增强输出：SDR · 保持原分辨率",
     intensity: "增强强度", start: "开启增强", stop: "停止并释放", choose: "请选择显卡", idle: "增强未开启", busy: "正在处理…",
     active: "增强已开启", waiting: "等待首帧", select: "请选择处理显卡和 NR 运行时。", unavailable: "当前播放器不支持原生视频挂载。",
@@ -13,6 +14,7 @@
     close: "Close", gpu: "Processing GPU", loading: "Detecting GPUs…", retry: "Retry detection", detectionFailed: "GPU detection failed", runtime: "NR runtime DLL", browse: "Choose DLL directory",
     style: "Style", standard: "Default", natural: "Natural", cinema: "Cinema", local_tone: "Local tone", local_struct: "Local structure",
     skin_struct: "Skin structure", use_auto_mask: "Automatic skin mask", applied: "Settings applied",
+    frameRate: "Enhancement frame rate limit", sourceRate: "Source frame rate",
     sdr: "Compatibility: HDR / Dolby Vision to SDR", output: "Enhancement output: SDR · Original resolution",
     intensity: "Intensity", start: "Enable enhancement", stop: "Stop and release", choose: "Select a GPU", idle: "Enhancement off", busy: "Working…",
     active: "Enhancement active", waiting: "Waiting for first frame", select: "Select a processing GPU and NR runtime.", unavailable: "This host does not support native video attachment.",
@@ -24,7 +26,7 @@
   let deviceState = "loading";
   const defaults = { style: 0, intensity: 0.5, local_tone: 1, local_struct: 1, skin_struct: 0.5, use_auto_mask: false };
   const parameters = Object.keys(defaults);
-  let preferences = { gpuUuid: "", runtimePath: "", normalizeSdr: true, ...defaults };
+  let preferences = { gpuUuid: "", runtimePath: "", normalizeSdr: true, frameRateLimit: 15, ...defaults };
   let pending = false, updateTimer;
   function readSettings() {
     return Object.fromEntries(parameters.map((key) => [key, key === "use_auto_mask" ? $(key).checked : Number($(key).value)]));
@@ -36,7 +38,7 @@
     }
   }
   function controls() {
-    for (const id of ["retry", "browse", "gpu", "runtime", "normalizeSdr", "start"]) $(id).disabled = busy || attached;
+    for (const id of ["retry", "browse", "gpu", "runtime", "normalizeSdr", "frameRateLimit", "start"]) $(id).disabled = busy || attached;
     $("gpu").disabled ||= deviceState !== "ready";
     $("start").disabled ||= deviceState !== "ready";
     for (const id of parameters) $(id).disabled = busy && !attached;
@@ -53,7 +55,7 @@
     $("retry").hidden = deviceState !== "failed";
   }
   async function save(settings = readSettings()) {
-    preferences = { gpuUuid: $("gpu").value, runtimePath: $("runtime").value.trim(), normalizeSdr: $("normalizeSdr").checked, ...settings };
+    preferences = { gpuUuid: deviceState === "ready" ? $("gpu").value : preferences.gpuUuid, runtimePath: $("runtime").value.trim(), normalizeSdr: $("normalizeSdr").checked, frameRateLimit: Number($("frameRateLimit").value), ...settings };
     await api.storage.set("preferences", preferences);
   }
   async function action(work) {
@@ -113,7 +115,7 @@
     amounts(); controls(); pending = true;
     clearTimeout(updateTimer); updateTimer = setTimeout(flushSettings, 150);
   };
-  for (const id of ["gpu", "runtime", "normalizeSdr"]) $(id).onchange = () => action(() => save());
+  for (const id of ["gpu", "runtime", "normalizeSdr", "frameRateLimit"]) $(id).onchange = () => action(() => save());
   $("start").onclick = () => action(async () => {
     await save();
     if (!preferences.gpuUuid || !preferences.runtimePath) throw new Error(t.select);
@@ -124,7 +126,7 @@
       if (!devices.some((d) => d.uuid === preferences.gpuUuid)) throw new Error(t.savedMissing);
       const runtime = await api.native.call("enhance", "runtime.inspect", { path: preferences.runtimePath });
       await api.native.call("enhance", "runtime.configure", runtime);
-      await api.native.video.attach("enhance", { inputConversion: preferences.normalizeSdr ? "sdr-bt709" : "none", settings: { gpu_uuid: preferences.gpuUuid, ...readSettings() } });
+      await api.native.video.attach("enhance", { inputConversion: preferences.normalizeSdr ? "sdr-bt709" : "none", ...(preferences.frameRateLimit ? { frameRateLimit: preferences.frameRateLimit } : {}), settings: { gpu_uuid: preferences.gpuUuid, ...readSettings() } });
       for (let attempt = 0; attempt < 20; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 400));
         const owner = await api.native.call("enhance", "frames.status");
@@ -144,6 +146,7 @@
     preferences = { ...preferences, ...await api.storage.get("preferences") };
     $("runtime").value = preferences.runtimePath;
     $("normalizeSdr").checked = preferences.normalizeSdr !== false;
+    $("frameRateLimit").value = [0, 10, 15, 20, 24, 30].includes(preferences.frameRateLimit) ? preferences.frameRateLimit : 15;
     for (const key of parameters) {
       if (key === "use_auto_mask") $(key).checked = preferences[key] === true;
       else $(key).value = Number.isFinite(preferences[key]) ? preferences[key] : defaults[key];

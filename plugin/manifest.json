@@ -1,7 +1,7 @@
 {
   "id": "dev.openplayer.dlssnr.portable",
   "name": "DLSSNR",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "apiVersion": "1",
   "minHostVersion": "1.6.3",
   "entry": "manifest",

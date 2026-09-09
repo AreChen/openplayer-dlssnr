@@ -58,6 +58,7 @@ class FrameModule:
                     "error": session.error if session else None,
                     "generation": self.owner.generation if self.owner else 0,
                     "revision": self.owner.revision if self.owner else 0,
+                    "processedFrames": self.owner.processed_frames if self.owner else 0,
                     "settings": self.owner.options.get("settings", {}) if self.owner else {}}
         if method == "frames.close":
             self.close()

@@ -30,8 +30,8 @@ function load(file) {
 const { buildPluginViewDocument } = load(path.join(host, "src/app/pluginRuntime/viewDocument.ts"));
 const template = fs.readFileSync("plugin/view.html", "utf8"), script = fs.readFileSync("plugin/view.js", "utf8");
 const theme = { surface: "#141618", panel: "#202326", panelStrong: "#292d31", text: "#f0f2f4", muted: "#b0b7bf", faint: "#7c858e", accent: "#62c5ac", danger: "#e47777", line: "#3d444b", control: "#30363c" };
-function fixture(seed) {
-  window.fixture = { calls: [], preferences: seed, running: false, attached: false, fail: false };
+function fixture(seed, options) {
+  window.fixture = { calls: [], preferences: seed, running: false, attached: false, fail: false, failDevices: options.failDevices };
   const devices = [{ uuid: "GPU-0", name: "NVIDIA GeForce RTX 3080 Ti", pciBusId: "0000:01:00.0" }, { uuid: "GPU-1", name: "NVIDIA GeForce RTX 3080 Ti", pciBusId: "0000:07:00.0" }];
   window.addEventListener("message", ({ data: m }) => {
     if (m.type !== "openplayer:viewRequest") return;
@@ -48,10 +48,15 @@ function fixture(seed) {
       else if (m.command === "native.video.attach") {
         if (f.fail) throw new Error("Simulated attachment failure");
         if (m.args.options.settings.gpu_uuid !== "GPU-1") throw new Error("GPU 0 must not be selected by default");
+        if (m.args.options.frameRateLimit !== 15) throw new Error("expected saved frame rate limit");
         f.attached = true;
       } else if (m.command === "native.call") {
         const { method } = m.args;
-        if (method === "devices.list") result = devices;
+        if (method === "devices.list") {
+          setTimeout(() => window.postMessage({ type: "openplayer:viewResponse", pluginId: m.pluginId, requestId: m.requestId,
+            ok: !f.failDevices, result: devices, error: "GPU detection unavailable" }, "*"), options.delay ?? 50);
+          return;
+        }
         else if (method === "frames.status") result = { workerPid: f.attached ? 123 : null, device: f.attached ? devices[1] : null };
         else if (method === "frames.update") {
           f.updates = (f.updates || 0) + 1;
@@ -65,8 +70,8 @@ function fixture(seed) {
     window.postMessage({ type: "openplayer:viewResponse", pluginId: m.pluginId, requestId: m.requestId, ok: !error, result, error }, "*");
   });
 }
-function document(locale, seed = null) {
-  const html = template.replace("<!-- SCRIPT -->", `<script>(${fixture.toString()})(${JSON.stringify(seed)});${script}</script>`);
+function document(locale, seed = null, options = {}) {
+  const html = template.replace("<!-- SCRIPT -->", `<script>(${fixture.toString()})(${JSON.stringify(seed)},${JSON.stringify(options)});${script}</script>`);
   return buildPluginViewDocument(html, { id: "test.dlssnr", permissions: ["native.process", "native.video", "filesystem.pick"] }, locale, theme);
 }
 const browser = await chromium.launch({ headless: true, channel: values.channel });
@@ -81,6 +86,10 @@ try {
   assert(await page.locator("#retry").isHidden());
   await page.waitForFunction(() => !document.getElementById("gpu").disabled);
   assert.equal(await page.locator("#gpu").inputValue(), "", "never select the first GPU automatically");
+  assert.equal(await page.locator("#frameRateLimit").inputValue(), "15");
+  await page.locator("#style").click();
+  await page.screenshot({ path: path.join(output, "style-picker.png") });
+  await page.keyboard.press("Escape");
   await page.locator("#gpu").selectOption("GPU-1");
   await page.locator("#browse").click();
   await page.waitForFunction(() => window.fixture.preferences?.runtimePath === "E:/Runtime/nvngx_dlssnr.dll");
@@ -102,6 +111,7 @@ try {
   await page.screenshot({ path: path.join(output, "active-zh.png") });
   const saved = await page.evaluate(() => window.fixture.preferences);
   assert.equal(saved.gpuUuid, "GPU-1");
+  assert.equal(saved.frameRateLimit, 15);
   await page.locator("#stop").click();
   await page.waitForFunction(() => !window.fixture.running && !document.getElementById("start").disabled);
   await page.setContent(document("en-US", saved));
@@ -124,6 +134,18 @@ try {
     await page.locator("#error").scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(output, `error-en-${size.width}.png`) });
   }
+  await page.setContent(document("en-US", saved, { failDevices: true, delay: 300 }));
+  assert(!await page.locator("#gpu").textContent().then(text => text.includes("unavailable")));
+  await page.waitForFunction(() => !document.getElementById("retry").hidden);
+  assert(await page.locator("#start").isDisabled());
+  await page.locator("#intensity").fill("1");
+  await page.waitForFunction(() => window.fixture.preferences.intensity === 1);
+  assert.equal(await page.evaluate(() => window.fixture.preferences.gpuUuid), "GPU-1");
+  await page.evaluate(() => { window.fixture.failDevices = false; });
+  await page.locator("#retry").click();
+  await page.waitForFunction(() => !document.getElementById("gpu").disabled);
+  assert.equal(await page.locator("#gpu").inputValue(), "GPU-1");
+  assert(await page.locator("#retry").isHidden());
   // Execute the real host geometry hook against actual layout, including resize.
   const insetsHook = ts.transpileModule(fs.readFileSync(path.join(host, "src/hooks/usePluginPanelInsets.ts"), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },

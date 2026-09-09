@@ -15,7 +15,7 @@ The current host is required; older development hosts lack this API.
 With the prepared CPython 3.12/NumPy environment and native DLL:
 
 ```powershell
-rtk proxy .venv/Scripts/python.exe scripts/build-portable-module.py --vapoursynth .local/python/vapoursynth --host .local/build/dlssnr_host_v2.dll --output .local/plugin-ui --plugin-ui --archive .local/DLSSNR_0.3.0.opplugin
+rtk proxy python scripts/build-portable-module.py --vapoursynth .local/python/vapoursynth --host .local/build/dlssnr_host_v2.dll --output .local/plugin-ui --plugin-ui --archive .local/DLSSNR_0.4.0.opplugin
 ```
 
 Output paths must be new. `--plugin-ui` adds the plugin action, themed side panel,
@@ -102,7 +102,40 @@ settings after the worker acknowledges the update. Invalid controls return an
 are serialized with frame processing, reset temporal history on the next frame,
 and retain the worker, GPU and shared buffers. Rebuilds inherit updated settings.
 The panel coalesces input over 150 ms and does not stop/reattach for adjustments.
-Paused playback applies settings to the next processed frame, not a cached frame.
+Paused playback requests `native.video.refreshPaused` after settings are applied;
+the exact seek re-filters the paused position instead of waiting for playback.
+
+## Playback capacity
+
+Version 0.4.0 defaults to a 15 FPS enhancement cap, saved separately from NR
+settings. Choose 10, 15, 20, 24, 30 or source rate before enabling. The host's
+typed `frameRateLimit` drops frames before expensive conversion/NR and maintains
+audio speed and media timing. Every delivered frame still undergoes NR; this
+does not alternate enhanced frames with unprocessed source frames. It trades
+motion smoothness for a sustainable workload, not 60 FPS inference on a 19 FPS GPU.
+Choose a cap below sustained end-to-end processing capacity. Source rate can
+still desynchronize when processing cannot keep up; 4K may need a lower rate
+than the current panel offers. No automatic GPU performance selection is claimed.
+
+Evidence for the user's 1080p59.94 food video on GPU 1:
+`.local/realtime-1080p60-final.json` records 303 NR frames over 20.21 seconds
+with 20.20 seconds of media progression and peak mpv A/V error below 1ms.
+`.local/paused-1080p60-final.json` verifies changed paused screenshots, stable
+position and worker reuse with the same 15 FPS cap. UI tests include delayed GPU
+enumeration, failed-detection retry without losing the saved UUID, themed select
+popups/checkboxes and measured host chrome/transport avoidance across window sizes.
+
+Rejected experiments: inference-only budgeting still accumulated 3.1 seconds of
+lag; local wall-clock bypass restored sync by starving enhancement. Neither is
+included. The shipped path uses the existing FFmpeg rate filter instead.
+
+Delivery: `.local/delivery-0.4.0/DLSSNR_0.4.0.opplugin` and the sibling
+`OpenPlayerNRTest/openplayer-desktop.exe` test host. Exit the old player before
+importing the update and restart after import, because private video runtimes
+remain pinned until process exit. The test host is a standalone build, not NSIS.
+The final package also passes `.local/dv-rate-final.json`: the user's 3840x1606
+Profile-5 file at 30 seconds with a 10 FPS cap, SDR conversion and full stop/cleanup.
+That check does not establish sustained 4K synchronization.
 
 Evidence: 45 Python tests; `.local/plugin-live-ui-check/report.json` exercises live
 controls through the actual generated bridge with simulated replies;

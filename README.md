@@ -35,6 +35,13 @@ preserving resolution but not HDR output. Native-resolution 4K is expensive:
 multi-second seeks and A/V lag were observed; real-time 4K is not established.
 See [plugin operation and evidence](docs/plugin-ui.md).
 
+Version 0.4.0 adds paused-frame preview, automatic saved-GPU detection and a
+15 FPS default processing cap (selectable before enabling). The user's 1080p59.94
+video passed a 20-second GPU-1 run with 303 enhanced frames and no accumulating
+A/V error. This reduces output motion cadence, not audio speed; it does not make
+19 FPS hardware process 60 enhanced frames per second. Shared host controls and
+side-panel spacing now follow the player chrome and transport bounds.
+
 ## Run the tests
 
 Use Python 3.11+ x64 (3.12 was tested). Install only into a project virtual

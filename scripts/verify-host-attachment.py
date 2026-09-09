@@ -21,6 +21,8 @@ def main():
     parser.add_argument("--replacement-video", type=Path)
     parser.add_argument("--normalize-sdr", action="store_true", help="exercise the host's explicit SDR input conversion")
     parser.add_argument("--paused-preview", action="store_true", help="verify settings change pixels without resuming")
+    parser.add_argument("--realtime", action="store_true", help="measure 20 seconds of actual audio/video sync")
+    parser.add_argument("--frame-rate-limit", type=float, help="host-owned input frame-rate cap")
     parser.add_argument("--seek", type=float, default=.2, help="actual in-file seek position for scene inspection")
     parser.add_argument("--runtime", required=True, type=Path)
     parser.add_argument("--gpu", required=True, help="explicit NVIDIA GPU UUID; never a display ordinal")
@@ -43,10 +45,16 @@ def main():
                        OPENPLAYER_SMOKE_RUNTIME_BUNDLE=str(bundle),
                        OPENPLAYER_SMOKE_FRAME_OPTIONS=json.dumps({"inputConversion": "sdr-bt709" if args.normalize_sdr else "none", "settings": {"gpu_uuid": args.gpu, "intensity": .5}}),
                        OPENPLAYER_SMOKE_NVIDIA_RUNTIME=str(args.runtime.resolve(strict=True)))
+    if args.frame_rate_limit is not None:
+        options = json.loads(environment["OPENPLAYER_SMOKE_FRAME_OPTIONS"])
+        options["frameRateLimit"] = args.frame_rate_limit
+        environment["OPENPLAYER_SMOKE_FRAME_OPTIONS"] = json.dumps(options)
     config = Path(os.environ["APPDATA"]) / "vapoursynth/vapoursynth.toml"
     environment["OPENPLAYER_SMOKE_SEEK_SECONDS"] = str(args.seek)
     if args.paused_preview:
         environment["OPENPLAYER_SMOKE_PAUSED_PREVIEW"] = "1"
+    if args.realtime:
+        environment["OPENPLAYER_SMOKE_REALTIME"] = "1"
     if args.replacement_video:
         environment["OPENPLAYER_SMOKE_REPLACEMENT_MEDIA"] = str(args.replacement_video.resolve(strict=True))
     before = helpers["digest"](config) if config.exists() else None
@@ -88,6 +96,11 @@ def main():
                     or any((frame.get("device") or {}).get("uuid") != args.gpu for frame in frames)):
                 raise RuntimeError(f"{action}: no processed/reused frame evidence")
             entry["frames"] = frames
+            if args.realtime:
+                entry["realtime"] = [json.loads(line.removeprefix("REALTIME_RESULT "))
+                    for line in entry["stdout"].splitlines() if line.startswith("REALTIME_RESULT ")]
+                if len(entry["realtime"]) != 1:
+                    raise RuntimeError("missing real-time sync measurement")
             if args.paused_preview:
                 if "PASS: paused settings refresh preserved position" not in entry["stdout"]:
                     raise RuntimeError("paused preview evidence missing")

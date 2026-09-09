@@ -33,6 +33,7 @@ class FrameServiceTests(unittest.TestCase):
                 self.assertEqual(rebuilt.generation, 2)
                 self.assertEqual(rebuilt.startup_ms, 0)
                 np.testing.assert_array_equal(rebuilt.process(self.frame)[0, 0, :3], [100, 1, 200])
+                self.assertEqual(owner.processed_frames, 3)
         self.assertFalse(any(process.pid == pid for process in mp.active_children()))
         for name in names:
             with self.assertRaises(FileNotFoundError):
