@@ -18,6 +18,8 @@ database, or window hierarchy is changed.
 - A native-v1 frame owner module uses the existing SDK control protocol; a separate opt-in host test verifies real NGX worker cleanup on plugin disable, upgrade and uninstall.
 - A relocatable private runtime can be staged and verified through real host package import, without global Python or VapourSynth configuration. See [portable runtime deployment](docs/portable-runtime.md); no playback UI or public attachment is included yet.
 - The Windows host harness now loads a verified private copy, reuses one resident runtime, rejects conflicts and reclaims stale copies on the next run. `scripts/verify-host-runtime.py` checks this in two real window runs; normal-player plugin attachment is still absent.
+- The native module can enumerate GPUs and select a stable GPU UUID without falling back to another card. See [GPU selection](docs/gpu-selection.md) for the tested headless path.
+- Session-owned filter cleanup has an opt-in window runner. Stop/reconnect passed with real processing; the full window matrix remains incomplete. See [attachment validation](docs/host-attachment.md).
 
 This prototype uses CPU frame buffers with GPU upload/readback, **not zero-copy
 GPU textures**. It is single-caller, synchronous, limited to 1920x1080 and one

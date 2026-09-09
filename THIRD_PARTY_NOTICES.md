@@ -2,8 +2,11 @@
 
 - `third_party/DLSS5Tool` is the unmodified MIT-licensed upstream source, pinned to
   `78ee043e2800317b8140859bec85726b15189696`. Its full copyright and license are
-  retained in that submodule. We compile its native host and adapt its Python
-  engine, without copying its GUI or changing its proprietary runtime.
+  retained in that submodule. We adapt its Python engine without copying its GUI
+  or changing its proprietary runtime. The build applies our MIT-licensed
+  `native/dlssnr-adapter-selection.patch` to a temporary source copy for explicit
+  D3D12 adapter selection and verification. The pinned submodule stays unchanged;
+  this local extension is not an upstream feature claim.
 - NVIDIA DLSS SDK headers/import libraries are external build inputs. The
   `nvngx_dlssnr.dll` runtime is an explicit external input. Neither the SDK nor
   runtime is committed or redistributed by this repository. Building and

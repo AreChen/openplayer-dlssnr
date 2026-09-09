@@ -33,6 +33,7 @@ class FrameClient:
             self.generation = reply["generation"]
             self.worker_pid = reply["worker_pid"]
             self.engine = reply["engine"]
+            self.device = reply.get("device")
             self.reused = reply["reused"]
             self.startup_ms = reply["startup_ms"]
             for name in reply["buffers"]:

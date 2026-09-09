@@ -43,6 +43,7 @@ class FrameModule:
         if method == "frames.status":
             session = self.owner.session if self.owner else None
             return {"running": self.owner is not None, "workerPid": session.worker_pid if session else None,
+                    "device": session.device if session else None,
                     "error": session.error if session else None,
                     "generation": self.owner.generation if self.owner else 0}
         if method == "frames.close":

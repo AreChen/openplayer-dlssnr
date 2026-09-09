@@ -71,7 +71,7 @@ def stage(output, vapoursynth, host):
     app = output / "app"
     app.mkdir()
     for name in ("frame_module.py", "bundled_frame_module.py", "native_protocol.py", "frame_session.py",
-                 "frame_service.py", "frame_client.py", "frame_wire.py", "dlssnr_backend.py"):
+                 "frame_service.py", "frame_client.py", "frame_wire.py", "dlssnr_backend.py", "host_vapoursynth.py", "gpu_devices.py"):
         shutil.copyfile(ROOT / name, app / name)
     upstream = app / "third_party/DLSS5Tool"
     upstream.mkdir(parents=True)
@@ -88,7 +88,7 @@ def stage(output, vapoursynth, host):
                     "capabilities": [{"id": "native", "name": "Native frame processing", "kind": "nativeTool",
                                       "permissions": ["native.process"]}],
                     "nativeModules": [{"id": "enhance", "protocol": "openplayer-native-v1",
-                                       "methods": ["runtime.configure", "frames.open", "frames.status", "frames.close"],
+                                       "methods": ["devices.list", "runtime.configure", "frames.open", "frames.status", "frames.close"],
                                        "targets": {"windows-x86_64": {"entry": "runtime/python.exe",
                                            "sha256": executable_hash,
                                            "args": ["-I", "-B", "../app/bundled_frame_module.py"]}}}]}}

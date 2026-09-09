@@ -16,6 +16,11 @@ class BundledModule:
         self.module = None
 
     def call(self, method, params):
+        if method == "devices.list":
+            if params not in (None, {}):
+                raise ValueError("devices.list takes no parameters")
+            from gpu_devices import list_devices
+            return list_devices()
         if method == "runtime.configure":
             if (not isinstance(params, dict) or set(params) != {"path", "sha256"}
                     or not isinstance(params["path"], str) or not isinstance(params["sha256"], str)

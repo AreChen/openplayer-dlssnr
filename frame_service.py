@@ -65,7 +65,8 @@ class FrameService:
         reply = {"generation": self.generation, "buffers": self.session.buffer_names,
                  "width": width, "height": height, "worker_pid": self.session.worker_pid,
                  "engine": self.engine, "reused": reused,
-                 "startup_ms": 0 if reused else self.session.startup_ms}
+                 "startup_ms": 0 if reused else self.session.startup_ms,
+                 "device": self.session.device}
         self.log("attach", **{key: value for key, value in reply.items() if key != "buffers"})
         return reply
 

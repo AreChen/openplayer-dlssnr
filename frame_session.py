@@ -28,7 +28,7 @@ def _worker(connection, names, shape, factory, options):
             memories.append(SharedMemory(name=name))
         source, output = [np.ndarray(shape, np.uint8, buffer=m.buf) for m in memories]
         processor = factory(shape[1], shape[0], options)
-        connection.send({"ok": True})
+        connection.send({"ok": True, "device": getattr(processor, "device", None)})
         while True:
             command = connection.recv()
             if command["op"] == "stop":
@@ -100,7 +100,7 @@ class FrameSession:
             self.worker_pid = self._process.pid
             child.close()
             child = None
-            self._receive(startup_timeout)
+            self.device = self._receive(startup_timeout).get("device")
         except Exception as error:
             self.error = str(error)
             self.close()
@@ -119,6 +119,7 @@ class FrameSession:
             raise ProcessorError("frame worker disconnected") from error
         if not message.get("ok"):
             raise ProcessorError(message.get("error", "frame worker failed"))
+        return message
 
     def _request(self, command):
         try:
