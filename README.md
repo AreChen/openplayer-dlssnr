@@ -1,10 +1,11 @@
 # OpenPlayer DLSSNR prototype
 
 Independent, Windows-only experiment for processing SDR video frames with
-DLSSNR. **This is not an installable `.opplugin`.** Real decoded frames now pass
-through DLSSNR inside OpenPlayer's opt-in native window smoke harness. The normal
-player does not expose this adapter. No installed binary, registry setting, user
-database, or window hierarchy is changed.
+DLSSNR. **An installable development plugin is now available; published OpenPlayer
+1.6.3 cannot run it.** The current host checkout exposes permissioned single-stage
+video attachment. See [build and test the plugin](docs/plugin-ui.md) for the GPU
+selector, runtime selection and enhancement controls. No window capture or
+replacement renderer is used. Full GUI launch consent remains a manual test.
 
 ## What works
 
@@ -16,10 +17,11 @@ database, or window hierarchy is changed.
 - A native libmpv probe and a test-only OpenPlayer adapter exercise live frame reinsertion, pause, seek, filter detach/reattach, resize, fullscreen and close without hiding the overlay.
 - An opt-in owner-scoped frame service reuses one engine across filter rebuilds, resets temporal history for every new lease, and releases it when the owner closes.
 - A native-v1 frame owner module uses the existing SDK control protocol; a separate opt-in host test verifies real NGX worker cleanup on plugin disable, upgrade and uninstall.
-- A relocatable private runtime can be staged and verified through real host package import, without global Python or VapourSynth configuration. See [portable runtime deployment](docs/portable-runtime.md); no playback UI or public attachment is included yet.
-- The Windows host harness now loads a verified private copy, reuses one resident runtime, rejects conflicts and reclaims stale copies on the next run. `scripts/verify-host-runtime.py` checks this in two real window runs; normal-player plugin attachment is still absent.
+- A relocatable private runtime can be staged and verified through real host package import, without global Python or VapourSynth configuration. See [portable runtime deployment](docs/portable-runtime.md).
+- The Windows host loads a verified private copy, reuses one resident runtime, rejects conflicts and reclaims stale copies on the next run. `scripts/verify-host-runtime.py` checks this in two real window runs.
 - The native module can enumerate GPUs and select a stable GPU UUID without falling back to another card. See [GPU selection](docs/gpu-selection.md) for the tested headless path.
-- Session-owned filter cleanup has an opt-in window runner. All six GPU-1 scenarios passed: stop/reconnect, disable, upgrade, uninstall, worker crash and active-enhancement app exit. See [attachment validation](docs/host-attachment.md); public plugin attachment remains unavailable.
+- Production attachment commands passed eight GPU-1 window scenarios: stop/reconnect, disable, upgrade, uninstall, worker crash, app exit, public detach and media replacement. See [attachment validation](docs/host-attachment.md). The isolated harness registers test sessions instead of clicking consent.
+- The development plugin view uses host theme components and redb storage. GPU choice is explicit and persists UUID, never a default display ordinal. Browser tests exercise the real generated view bridge with simulated host replies.
 
 This prototype uses CPU frame buffers with GPU upload/readback, **not zero-copy
 GPU textures**. It is single-caller, synchronous, limited to 1920x1080 and one
@@ -104,10 +106,10 @@ trusted adapter in the player process; only the NGX engine is isolated in a work
 
 Do not add window capture/reparenting, a replacement renderer, arbitrary Python
 execution permissions, or large native plugin infrastructure to make this test
-look integrated. Before publishing a plugin, solve runtime deployment, integration
-with host-owned native lifecycle/consent and realtime performance. The experimental
+look integrated. Before a public release, validate GUI consent, color handling,
+mid-stream format changes and sustained A/V performance. The experimental
 owner resolves engine reinitialization on same-format seeks. Its
 [native control module](docs/native-frame-module.md) now has real SDK registry
-cleanup coverage, but playback attachment remains test-only. UI and presets can
-then reuse existing SDK primitives. If production
-integration requires substantial host complexity, keep this experimental.
+cleanup coverage, and the development UI now composes existing SDK primitives
+with permissioned attachment. This remains an experimental single-stage CPU-copy
+path, not an interpolation/upscaling framework.

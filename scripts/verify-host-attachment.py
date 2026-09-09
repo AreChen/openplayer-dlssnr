@@ -18,11 +18,14 @@ def main():
     parser.add_argument("bundle", type=Path)
     parser.add_argument("--window-smoke", required=True, type=Path)
     parser.add_argument("--video", required=True, type=Path)
+    parser.add_argument("--replacement-video", type=Path)
     parser.add_argument("--runtime", required=True, type=Path)
     parser.add_argument("--gpu", required=True, help="explicit NVIDIA GPU UUID; never a display ordinal")
     parser.add_argument("--report", required=True, type=Path)
-    parser.add_argument("--scenario", action="append", choices=["stop", "disable", "upgrade", "uninstall", "crash", "app-exit"])
+    parser.add_argument("--scenario", action="append", choices=["stop", "disable", "upgrade", "uninstall", "crash", "app-exit", "media-change", "detach"])
     args = parser.parse_args()
+    if args.scenario and "media-change" in args.scenario and not args.replacement_video:
+        parser.error("media-change requires --replacement-video")
     report_path = args.report.resolve()
     work = report_path.with_suffix(".artifacts")
     if report_path.exists() or work.exists():
@@ -38,6 +41,8 @@ def main():
                        OPENPLAYER_SMOKE_FRAME_OPTIONS=json.dumps({"settings": {"gpu_uuid": args.gpu, "intensity": .5}}),
                        OPENPLAYER_SMOKE_NVIDIA_RUNTIME=str(args.runtime.resolve(strict=True)))
     config = Path(os.environ["APPDATA"]) / "vapoursynth/vapoursynth.toml"
+    if args.replacement_video:
+        environment["OPENPLAYER_SMOKE_REPLACEMENT_MEDIA"] = str(args.replacement_video.resolve(strict=True))
     before = helpers["digest"](config) if config.exists() else None
     report = {"passed": False, "runs": []}
     try:

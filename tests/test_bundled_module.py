@@ -19,6 +19,19 @@ class FakeModule:
 
 
 class BundledModuleTests(unittest.TestCase):
+    def test_inspection_hashes_without_loading_or_configuring(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            library = root / "nvngx_dlssnr.dll"
+            library.write_bytes(b"test only")
+            module = BundledModule(root, root / "log", module_factory=FakeModule)
+            inspected = module.call("runtime.inspect", {"path": str(library)})
+            self.assertEqual(inspected["sha256"], hashlib.sha256(b"test only").hexdigest())
+            self.assertIsNone(module.module)
+            for params in ({}, {"path": "relative.dll"}, {"path": None}, {"path": str(library), "extra": 1}):
+                with self.assertRaises(ValueError):
+                    module.call("runtime.inspect", params)
+
     def test_explicit_runtime_and_reconfigure_cleanup(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

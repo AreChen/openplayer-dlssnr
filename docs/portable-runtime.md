@@ -1,9 +1,10 @@
 # Deploy the private runtime
 
-The native module can now be staged as a relocatable directory and imported by
-the development host. **This is a developer module with no user-facing actions,
-not the finished DLSSNR playback plugin.** Published OpenPlayer 1.6.3 does not
-support this native extension. No installer or public release is produced here.
+The native module can be staged as a relocatable directory and imported by
+the development host. The default build is a headless developer module;
+`--plugin-ui` now adds the [installable development plugin](plugin-ui.md).
+Published OpenPlayer 1.6.3 does not support this extension. No public release is
+produced here; historical verification below predates the UI integration.
 
 ## Build and verify
 

@@ -1,6 +1,8 @@
 # Validate session-owned video attachment
 
-**Developer harness only. No public attach API or plugin UI is exposed yet.**
+**Developer harness for the host's native video lifecycle.** The current host
+also exposes permissioned attachment and a [development plugin UI](plugin-ui.md).
+The harness does not exercise GUI launch consent.
 The host associates one filter cleanup lease with its registered native session.
 Mount/detach/stop are serialized; failed mounts roll back, failed cleanup stays
 tracked for retry, and stopped sessions cannot reattach.
@@ -25,12 +27,14 @@ Build the sibling host's `window-smoke` binary and a fresh portable bundle, then
 rtk proxy .venv/Scripts/python.exe scripts/verify-host-attachment.py .local/portable-gpu-selection --window-smoke ../RustPlayer/target/debug/window-smoke.exe --video .local/motion-720p-long.mp4 --runtime .local/runtime/nvngx_dlssnr.dll --gpu GPU-76e0cbba-1c68-0d53-26ca-b999df6f0e9b --report .local/attachment-check.json
 ```
 
-Report/artifact paths must be new. `--scenario stop|disable|upgrade|uninstall|crash|app-exit`
+Report/artifact paths must be new. `--scenario stop|disable|upgrade|uninstall|crash|app-exit|detach|media-change`
 narrows the matrix. These real windows with inert WebViews change focus, resize,
 enter fullscreen and inject Alt+F4 after verifying focus and rejecting held
 modifiers. Run only when focus changes are acceptable; the user explicitly
 authorized them for this verification. GPU selection controls NR, not
 mpv/WebView's display device.
+For `detach` or `media-change`, provide a `--plugin-ui` bundle with a declared
+video adapter. `media-change` also requires `--replacement-video`.
 
 Acceptance requires processed/changed frames, same-worker reuse, nonblack
 processed/recovered screenshots, native close markers, zero job processes,
@@ -43,6 +47,11 @@ recovered screenshot. Every case requires the native event loop to return before
 the supervisor accepts process completion.
 
 ## Evidence and remaining work
+
+- Public-command follow-up: `public-lifecycle-matrix.json` passed six lifecycle
+  cases with enabled-filter status and real GPU-1 output. `public-media-detach.json`
+  passed formal detach and actual 720p-to-1080p replacement. Normal GUI consent
+  remains a separate manual step; these runs register an internal test session.
 
 - 2026-09-09 `.local/host-attachment-lifecycle.json`: `stop` passed with processed
   frames, reused worker, pause/seek, detach/reattach, maximized fullscreen,
@@ -65,7 +74,8 @@ the supervisor accepts process completion.
   checks that cleanup failure retains registry tracking and permits retry, and
   that application shutdown executes attachment cleanup.
 
-Remaining gates: media/format changes, real React controls/consent, production
-attachment authorization and A/V synchronization.
+Remaining gates: mid-stream format changes, full GUI launch consent and sustained
+A/V synchronization. Production authorization is implemented; browser tests use
+the real view bridge/styles but simulate privileged replies.
 This batch does not establish HDR, interpolation, super-resolution or sustained
 playback performance.

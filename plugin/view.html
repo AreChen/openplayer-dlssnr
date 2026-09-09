@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DLSSNR</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; background: transparent; color: var(--op-text); font: 14px "Segoe UI", sans-serif; letter-spacing: 0; }
+    .app { width: 100%; height: 100%; display: flex; flex-direction: column; background: color-mix(in srgb, var(--op-panel) 92%, transparent); }
+    header, footer { display: flex; gap: 8px; align-items: center; padding: 14px; flex-wrap: wrap; }
+    header { border-bottom: 1px solid var(--op-line); }
+    h1 { font-size: 17px; margin: 0; flex: 1; }
+    main { flex: 1; min-height: 0; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+    .field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+    input, select { width: 100%; min-width: 0; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .row input { flex: 1; }
+    footer { border-top: 1px solid var(--op-line); }
+    .status { padding: 10px 0; border-top: 1px solid var(--op-line); overflow-wrap: anywhere; line-height: 1.6; }
+    #error { color: #ef8a86; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+    #device { font-size: 12px; overflow-wrap: anywhere; white-space: pre-line; }
+    button { min-height: 32px; }
+    button:disabled { opacity: 0.5; cursor: default; }
+    output { width: 3em; text-align: right; }
+  </style>
+</head>
+<body>
+  <div class="app op-view">
+    <header><h1>DLSSNR</h1><button id="close" class="op-button op-button--ghost" data-text="close"></button></header>
+    <main>
+      <div class="field"><label for="gpu" data-text="gpu"></label><select id="gpu" class="op-select"></select><button id="connect" class="op-button" data-text="connect"></button></div>
+      <div class="field"><label for="runtime" data-text="runtime"></label><input id="runtime" class="op-input" spellcheck="false" placeholder="nvngx_dlssnr.dll"><button id="browse" class="op-button" data-text="browse"></button></div>
+      <div class="field"><label for="intensity" data-text="intensity"></label><div class="row"><input id="intensity" class="op-slider" type="range" min="0" max="1" step="0.05" value="0.5"><output id="amount">0.50</output></div></div>
+      <div class="status" role="status"><div id="status"></div><div id="device" class="op-muted"></div></div>
+      <p id="error" role="alert"></p>
+    </main>
+    <footer><button id="start" class="op-button op-button--primary" data-text="start"></button><button id="stop" class="op-button op-button--danger" data-text="stop"></button></footer>
+  </div>
+  <!-- SCRIPT -->
+</body>
+</html>

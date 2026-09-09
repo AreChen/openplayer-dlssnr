@@ -26,7 +26,7 @@ def copy_tree(source, destination):
             shutil.copyfile(path, target)
 
 
-def stage(output, vapoursynth, host):
+def stage(output, vapoursynth, host, plugin_ui=False):
     if (sys.platform != "win32" or sys.version_info[:2] != (3, 12)
             or platform.machine().lower() not in {"amd64", "x86_64"}):
         raise ValueError("build with a prepared Windows x64 CPython 3.12 runtime")
@@ -88,10 +88,20 @@ def stage(output, vapoursynth, host):
                     "capabilities": [{"id": "native", "name": "Native frame processing", "kind": "nativeTool",
                                       "permissions": ["native.process"]}],
                     "nativeModules": [{"id": "enhance", "protocol": "openplayer-native-v1",
-                                       "methods": ["devices.list", "runtime.configure", "frames.open", "frames.status", "frames.close"],
+                                       "methods": ["devices.list", "runtime.inspect", "runtime.configure", "frames.open", "frames.status", "frames.close"],
                                        "targets": {"windows-x86_64": {"entry": "runtime/python.exe",
                                            "sha256": executable_hash,
                                            "args": ["-I", "-B", "../app/bundled_frame_module.py"]}}}]}}
+    if plugin_ui:
+        ui = json.loads((ROOT / "plugin/manifest.json").read_text(encoding="utf-8"))
+        native = manifest["contributes"]["nativeModules"]
+        native[0]["videoAdapter"] = "vapoursynth-rgb-v1"
+        manifest = {**ui, "contributes": {**ui["contributes"], "nativeModules": native}}
+        (output / "plugin").mkdir()
+        shutil.copyfile(ROOT / "plugin/runtime.js", output / "plugin/runtime.js")
+        html = (ROOT / "plugin/view.html").read_text(encoding="utf-8")
+        script = (ROOT / "plugin/view.js").read_text(encoding="utf-8")
+        (output / "plugin/view.html").write_text(html.replace("<!-- SCRIPT -->", f"<script>{script}</script>"), encoding="utf-8")
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     inventory = {}
     for path in sorted(output.rglob("*")):
@@ -114,6 +124,22 @@ if __name__ == "__main__":
     parser.add_argument("--vapoursynth", required=True, type=Path)
     parser.add_argument("--host", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--plugin-ui", action="store_true", help="build the development host's installable video plugin")
+    parser.add_argument("--archive", type=Path, help="also create a new .opplugin archive outside the staged directory")
     args = parser.parse_args()
-    print(json.dumps(stage(args.output.resolve(), args.vapoursynth.resolve(strict=True),
-                           args.host.resolve(strict=True)), indent=2))
+    output = args.output.resolve()
+    if args.archive and (args.archive.exists() or args.archive.resolve().is_relative_to(output)):
+        parser.error("archive must be new and outside the staged directory")
+    report = stage(output, args.vapoursynth.resolve(strict=True), args.host.resolve(strict=True), args.plugin_ui)
+    if args.archive:
+        with zipfile.ZipFile(args.archive, "x", zipfile.ZIP_DEFLATED) as archive:
+            for file in sorted(output.rglob("*")):
+                if file.is_file():
+                    archive.write(file, file.relative_to(output).as_posix())
+        with zipfile.ZipFile(args.archive) as archive:
+            if archive.testzip() is not None:
+                raise ValueError("package CRC validation failed")
+        with args.archive.open("rb") as stream:
+            report["archiveSha256"] = hashlib.file_digest(stream, "sha256").hexdigest()
+        report["archive"] = str(args.archive.resolve())
+    print(json.dumps(report, indent=2))

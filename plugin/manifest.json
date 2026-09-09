@@ -1,0 +1,16 @@
+{
+  "id": "dev.openplayer.dlssnr.portable",
+  "name": "DLSSNR",
+  "version": "0.2.0",
+  "apiVersion": "1",
+  "minHostVersion": "1.6.3",
+  "entry": "manifest",
+  "description": "Experimental SDR video enhancement. Requires a development host with native.video.",
+  "runtime": { "kind": "webviewJs", "entry": "plugin/runtime.js", "sandbox": "openplayer-worker" },
+  "contributes": {
+    "capabilities": [{ "id": "video", "name": "Native video processing", "kind": "nativeTool", "permissions": ["native.process", "native.video", "filesystem.pick"] }],
+    "actions": [{ "id": "open", "label": "DLSSNR", "placement": "controls.right", "command": "plugin.open-dlssnr", "icon": "settings", "requiresMedia": false }],
+    "views": [{ "id": "enhance", "title": "DLSSNR", "presentation": "sidePanel", "entry": "plugin/view.html" }],
+    "storage": { "version": 1, "defaults": { "preferences": { "gpuUuid": "", "runtimePath": "", "intensity": 0.5 } } }
+  }
+}
