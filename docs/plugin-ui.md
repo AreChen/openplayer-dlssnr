@@ -8,6 +8,10 @@ or a claim of real-time 4K playback. Update the host as well as the plugin.
 
 ## Build
 
+Paused parameter changes use the host's `native.video.refreshPaused` after the
+worker acknowledges settings. This re-filters the same position without resuming.
+The current host is required; older development hosts lack this API.
+
 With the prepared CPython 3.12/NumPy environment and native DLL:
 
 ```powershell

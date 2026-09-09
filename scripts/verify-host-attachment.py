@@ -7,7 +7,7 @@ import runpy
 import subprocess
 import time
 
-from PIL import Image, ImageStat
+from PIL import Image, ImageStat, ImageChops
 
 ROOT = Path(__file__).resolve().parent.parent
 helpers = runpy.run_path(str(ROOT / "scripts/verify-portable-module.py"))
@@ -20,6 +20,7 @@ def main():
     parser.add_argument("--video", required=True, type=Path)
     parser.add_argument("--replacement-video", type=Path)
     parser.add_argument("--normalize-sdr", action="store_true", help="exercise the host's explicit SDR input conversion")
+    parser.add_argument("--paused-preview", action="store_true", help="verify settings change pixels without resuming")
     parser.add_argument("--seek", type=float, default=.2, help="actual in-file seek position for scene inspection")
     parser.add_argument("--runtime", required=True, type=Path)
     parser.add_argument("--gpu", required=True, help="explicit NVIDIA GPU UUID; never a display ordinal")
@@ -44,6 +45,8 @@ def main():
                        OPENPLAYER_SMOKE_NVIDIA_RUNTIME=str(args.runtime.resolve(strict=True)))
     config = Path(os.environ["APPDATA"]) / "vapoursynth/vapoursynth.toml"
     environment["OPENPLAYER_SMOKE_SEEK_SECONDS"] = str(args.seek)
+    if args.paused_preview:
+        environment["OPENPLAYER_SMOKE_PAUSED_PREVIEW"] = "1"
     if args.replacement_video:
         environment["OPENPLAYER_SMOKE_REPLACEMENT_MEDIA"] = str(args.replacement_video.resolve(strict=True))
     before = helpers["digest"](config) if config.exists() else None
@@ -79,12 +82,20 @@ def main():
             frames = [json.loads(line.removeprefix("HOST_FRAME "))
                       for line in (entry["stdout"] + entry["stderr"]).splitlines()
                       if line.startswith("HOST_FRAME ")]
-            if (len(frames) < 2 or any(not frame["processed"] or frame["changedMean"] <= 0 for frame in frames)
+            if (len(frames) < 2 or any(not frame["processed"] for frame in frames) or not any(frame["changedMean"] > 0 for frame in frames)
                     or len({frame["workerPid"] for frame in frames}) != 1
                     or not any(frame["reused"] for frame in frames)
                     or any((frame.get("device") or {}).get("uuid") != args.gpu for frame in frames)):
                 raise RuntimeError(f"{action}: no processed/reused frame evidence")
             entry["frames"] = frames
+            if args.paused_preview:
+                if "PASS: paused settings refresh preserved position" not in entry["stdout"]:
+                    raise RuntimeError("paused preview evidence missing")
+                with Image.open(directory / "paused-0.png") as first, Image.open(directory / "paused-1.png") as second:
+                    difference = ImageStat.Stat(ImageChops.difference(first.convert("RGB"), second.convert("RGB"))).mean
+                    if max(difference) < .1:
+                        raise RuntimeError("paused parameters did not change the displayed frame")
+                    entry["pausedPixelDifference"] = difference
             entry["screenshots"] = {}
             for name in (("processed.png",) if action == "app-exit" else ("processed.png", "recovered.png")):
                 with Image.open(directory / name) as image:

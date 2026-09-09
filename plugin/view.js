@@ -102,6 +102,7 @@
       if (attached) {
         const result = await api.native.call("enhance", "frames.update", { settings });
         if (!result.applied) throw new Error(result.error);
+        await api.native.video.refreshPaused("enhance");
         $("applied").textContent = `${t.applied} (${result.revision})`;
       }
       await save(settings);

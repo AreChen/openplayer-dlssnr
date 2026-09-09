@@ -44,6 +44,7 @@ function fixture(seed) {
       else if (m.command === "native.start") f.running = true;
       else if (m.command === "native.stop") { f.running = false; f.attached = false; }
       else if (m.command === "native.video.status") result = { supported: true, running: f.running, attached: f.attached, filterEnabled: f.attached };
+      else if (m.command === "native.video.refreshPaused") result = true;
       else if (m.command === "native.video.attach") {
         if (f.fail) throw new Error("Simulated attachment failure");
         if (m.args.options.settings.gpu_uuid !== "GPU-1") throw new Error("GPU 0 must not be selected by default");
@@ -97,6 +98,7 @@ try {
   assert.equal(await page.evaluate(() => window.fixture.settings.intensity), 2.5);
   assert.equal(await page.evaluate(() => window.fixture.calls.filter(c => c.command === "native.start").length), starts);
   assert.equal(await page.evaluate(() => window.fixture.calls.filter(c => c.command === "native.video.attach").length), 1);
+  assert(await page.evaluate(() => window.fixture.calls.some(c => c.command === "native.video.refreshPaused")));
   await page.screenshot({ path: path.join(output, "active-zh.png") });
   const saved = await page.evaluate(() => window.fixture.preferences);
   assert.equal(saved.gpuUuid, "GPU-1");
