@@ -2,7 +2,8 @@
 
 **Development native-module support, not a shipped plugin UI.** Selection applies
 to the NR worker's D3D12 device, not mpv decode/presentation or WebView. While the
-user is gaming, use the headless probe rather than window tests that take focus.
+user is gaming, prefer the headless probe unless they explicitly authorize window
+tests that take focus. Such authorization does not change the selected NR GPU.
 
 The native-v1 module supports `devices.list` before runtime configuration. It
 returns `uuid`, `name`, `pciBusId`, current Windows `luid`, and `nodeMask`. Device

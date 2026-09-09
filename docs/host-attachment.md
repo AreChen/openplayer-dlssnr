@@ -25,33 +25,47 @@ Build the sibling host's `window-smoke` binary and a fresh portable bundle, then
 rtk proxy .venv/Scripts/python.exe scripts/verify-host-attachment.py .local/portable-gpu-selection --window-smoke ../RustPlayer/target/debug/window-smoke.exe --video .local/motion-720p-long.mp4 --runtime .local/runtime/nvngx_dlssnr.dll --gpu GPU-76e0cbba-1c68-0d53-26ca-b999df6f0e9b --report .local/attachment-check.json
 ```
 
-Report/artifact paths must be new. `--scenario stop|disable|upgrade|uninstall|crash`
+Report/artifact paths must be new. `--scenario stop|disable|upgrade|uninstall|crash|app-exit`
 narrows the matrix. These real windows with inert WebViews change focus, resize,
-enter fullscreen and inject Alt+F4 after verifying focus. Do not run during
-foreground gaming. GPU selection controls NR, not mpv/WebView's display device.
+enter fullscreen and inject Alt+F4 after verifying focus and rejecting held
+modifiers. Run only when focus changes are acceptable; the user explicitly
+authorized them for this verification. GPU selection controls NR, not
+mpv/WebView's display device.
 
 Acceptance requires processed/changed frames, same-worker reuse, nonblack
 processed/recovered screenshots, native close markers, zero job processes,
 generated-script cleanup and unchanged source/user configuration. A disabled mpv
 filter fails the runner even if original playback continued. Timeouts retain
 partial stdout/stderr for diagnosis.
+The `app-exit` case retains the active attachment until normal application
+shutdown, then checks session/job/script cleanup. Other cases also require a
+recovered screenshot. Every case requires the native event loop to return before
+the supervisor accepts process completion.
 
 ## Evidence and remaining work
 
 - 2026-09-09 `.local/host-attachment-lifecycle.json`: `stop` passed with processed
   frames, reused worker, pause/seek, detach/reattach, maximized fullscreen,
   unrelated-filter preservation, recovery and single Alt+F4.
-- The following `disable` run produced processed/recovered screenshots but the
-  supervisor timed out. Completion is **not verified**; the exact cause remains
-  unresolved. The old runner did not retain partial timeout output.
-- Foreground runs stopped when the user started gaming and requested GPU 1.
-  Explicit-GPU headless processing and actual package disable/replacement/
-  uninstall passed separately; see [GPU selection](gpu-selection.md).
+- The following historical `disable` run produced processed/recovered screenshots
+  but timed out. Its cause remains unresolved; the old runner did not retain
+  partial timeout output. It did not recur in the isolated repeat or subsequent
+  full matrices. This is not evidence of a diagnosed timeout fix.
+- 2026-09-09 `.local/attachment-matrix-final.json`: all six cases passed on GPU 1
+  (`GPU-76e0cbba-1c68-0d53-26ca-b999df6f0e9b`), including disable, upgrade,
+  uninstall, worker crash and active-enhancement app exit. Each finished in
+  16-19 seconds with unchanged source/user configuration. See
+  [GPU selection](gpu-selection.md) for device identity checks.
+- Host shutdown now executes session-owned attachment cleanup instead of only
+  stopping jobs and clearing the registry. The harness uses `run_return` to
+  verify loop completion and clean its temporary WebView directory; normal
+  player window behavior is unchanged.
 - Unit tests cover failed rollback, retained cleanup, terminal stop, callback
   keywords, frame properties and reset handling. The protocol integration test
-  checks that cleanup failure retains registry tracking and permits retry.
+  checks that cleanup failure retains registry tracking and permits retry, and
+  that application shutdown executes attachment cleanup.
 
-Remaining gates: the complete post-selection window matrix, active-window app-exit
-ownership, media/format changes, real React controls/consent and A/V synchronization.
+Remaining gates: media/format changes, real React controls/consent, production
+attachment authorization and A/V synchronization.
 This batch does not establish HDR, interpolation, super-resolution or sustained
 playback performance.

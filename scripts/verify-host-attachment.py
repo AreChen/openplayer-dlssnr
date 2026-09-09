@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import runpy
 import subprocess
+import time
 
 from PIL import Image, ImageStat
 
@@ -20,7 +21,7 @@ def main():
     parser.add_argument("--runtime", required=True, type=Path)
     parser.add_argument("--gpu", required=True, help="explicit NVIDIA GPU UUID; never a display ordinal")
     parser.add_argument("--report", required=True, type=Path)
-    parser.add_argument("--scenario", action="append", choices=["stop", "disable", "upgrade", "uninstall", "crash"])
+    parser.add_argument("--scenario", action="append", choices=["stop", "disable", "upgrade", "uninstall", "crash", "app-exit"])
     args = parser.parse_args()
     report_path = args.report.resolve()
     work = report_path.with_suffix(".artifacts")
@@ -40,15 +41,18 @@ def main():
     before = helpers["digest"](config) if config.exists() else None
     report = {"passed": False, "runs": []}
     try:
-        for action in args.scenario or ["stop", "disable", "upgrade", "uninstall", "crash"]:
+        for action in args.scenario or ["stop", "disable", "upgrade", "uninstall", "crash", "app-exit"]:
             directory = work / action
             environment.update(OPENPLAYER_SMOKE_NATIVE_ATTACHMENT=action,
                                OPENPLAYER_SMOKE_ATTACHMENT_WORK=str(directory))
+            started = time.monotonic()
+            print(f"RUN: {action}", flush=True)
             result = subprocess.run([str(ROOT / ".local/build/mpv_frame_probe.exe"), "--run",
                 str(args.window_smoke.resolve(strict=True)), "overlay-alt-f4"],
                 cwd=work, env=environment, timeout=40, capture_output=True,
                 creationflags=subprocess.CREATE_NO_WINDOW)
             entry = {"action": action, "exitCode": result.returncode,
+                     "elapsedSeconds": round(time.monotonic() - started, 3),
                      "stdout": result.stdout.decode("utf-8", errors="replace"),
                      "stderr": result.stderr.decode("utf-8", errors="replace")}
             report["runs"].append(entry)
@@ -58,7 +62,9 @@ def main():
                 raise RuntimeError(f"{action}: mpv reported a failed filter")
             for marker in ("PASS: registered native frame worker", "PASS: session attachment pause seek",
                            "PASS: maximized fullscreen client/video bounds with native filter",
-                           f"PASS: attachment {action} removed owned filter",
+                           ("PASS: active attachment app exit released filter and native job" if action == "app-exit"
+                            else f"PASS: attachment {action} removed owned filter"),
+                           "PASS: window smoke process ready to exit",
                            "PASS: resize alignment, fullscreen restore, companion close, mpv teardown"):
                 if marker not in entry["stdout"]:
                     raise RuntimeError(f"{action}: missing evidence: {marker}")
@@ -72,7 +78,7 @@ def main():
                 raise RuntimeError(f"{action}: no processed/reused frame evidence")
             entry["frames"] = frames
             entry["screenshots"] = {}
-            for name in ("processed.png", "recovered.png"):
+            for name in (("processed.png",) if action == "app-exit" else ("processed.png", "recovered.png")):
                 with Image.open(directory / name) as image:
                     stats = ImageStat.Stat(image.convert("RGB"))
                     if sum(stats.mean) < 3 or max(stats.stddev) < 1:
@@ -80,6 +86,7 @@ def main():
                     entry["screenshots"][name] = {"width": image.width, "height": image.height, "mean": stats.mean}
             if list(directory.glob("native-owned-*.vpy")):
                 raise RuntimeError(f"{action}: detached script was not cleaned")
+            print(f"PASS: {action} ({entry['elapsedSeconds']}s)", flush=True)
         helpers["verify_inventory"](bundle)
         if before != (helpers["digest"](config) if config.exists() else None):
             raise RuntimeError("user VapourSynth configuration changed")
