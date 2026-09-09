@@ -20,8 +20,8 @@ def validate_settings(settings):
         elif key == "use_auto_mask":
             if type(value) is not bool:
                 raise ValueError("use_auto_mask must be boolean")
-        elif type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 1:
-            raise ValueError(f"{key} must be finite and between 0 and 1")
+        elif type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 5:
+            raise ValueError(f"{key} must be finite and between 0 and 5")
     result = dict(settings)
     if "gpu_uuid" in result:
         result["gpu_uuid"] = normalize_uuid(result["gpu_uuid"])

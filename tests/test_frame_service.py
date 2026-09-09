@@ -1,6 +1,7 @@
 import multiprocessing as mp
 from multiprocessing.shared_memory import SharedMemory
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
@@ -38,6 +39,21 @@ class FrameServiceTests(unittest.TestCase):
                 SharedMemory(name=name)
         self.assertEqual([event[0] for event in self.events].count("engine-start"), 1)
         self.assertEqual([event[0] for event in self.events].count("engine-close"), 1)
+
+    def test_updates_serialize_with_live_frames(self):
+        with self.service() as owner:
+            with FrameClient(owner.endpoint, 64, 32) as client:
+                def process():
+                    return [int(client.process(self.frame)[0, 0, 0]) for _ in range(50)]
+                with ThreadPoolExecutor(max_workers=1) as pool:
+                    frames = pool.submit(process)
+                    for n in range(10):
+                        self.assertEqual(owner.update({"intensity": n / 10})["revision"], n + 1)
+                    values = frames.result(timeout=10)
+                self.assertEqual(values, sorted(values))
+                self.assertTrue(all(100 <= value <= 110 for value in values))
+                self.assertEqual(client.process(self.frame)[0, 0, 0], 110)
+                self.assertIsNone(client.error)
 
     def test_format_change_replaces_instead_of_accumulating_workers(self):
         with self.service() as owner:

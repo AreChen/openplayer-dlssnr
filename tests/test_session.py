@@ -114,10 +114,12 @@ class SessionTests(unittest.TestCase):
 
     def test_settings_validation(self):
         for settings in ({"arbitrary": 1}, {"intensity": float("nan")},
-                         {"intensity": 5}, {"style": 4}, {"use_auto_mask": 2}):
+                         {"intensity": 5.01}, {"style": 4}, {"use_auto_mask": 2}, {"skin_struct": True}):
             with self.assertRaises(ValueError):
                 validate_settings(settings)
         self.assertEqual(validate_settings({"intensity": 0.5}), {"intensity": 0.5})
+        self.assertEqual(validate_settings({"local_tone": 5, "local_struct": 0, "skin_struct": 5}),
+                         {"local_tone": 5, "local_struct": 0, "skin_struct": 5})
 
 
 if __name__ == "__main__":

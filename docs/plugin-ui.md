@@ -25,8 +25,8 @@ Validate the staged directory with the sibling official repository's exported
 1. Build the current host frontend and desktop executable. A test build can use
    `TAURI_CONFIG` with a separate application identifier to isolate settings.
 2. Import the `.opplugin` through Plugins settings and open an eligible video.
-3. Open **DLSSNR** from the player controls. Choose **Authorize and list GPUs**
-   and personally confirm the host-owned native launch warning.
+3. Open **DLSSNR** from the player controls. Choose **List GPUs**. Installation
+   grants declared permissions; the current host does not repeat launch prompts.
 4. Select the processing GPU explicitly. The options show PCI bus first so
    identically named cards remain distinguishable. No GPU is selected by default.
 5. Select the directory containing a trusted `nvngx_dlssnr.dll`, or enter its full
@@ -36,7 +36,7 @@ Validate the staged directory with the sibling official repository's exported
    panel alone keeps enhancement running. Switching media stops enhancement;
    re-enable explicitly for the next item.
 
-GPU UUID, runtime path and intensity persist through SDK storage in host redb.
+GPU UUID, runtime path and all NR settings persist through SDK storage in host redb.
 The active device identity is shown separately from the saved selection. A missing
 saved GPU fails explicitly; there is no automatic fallback to GPU 0. This choice
 does not select mpv's decoding/display or WebView GPU.
@@ -69,6 +69,28 @@ settings restore, directory picking, enable/stop, error retention and responsive
 layouts at 420x720 and 320x480. Replies are simulated: it does not load a GPU,
 install a plugin, bypass native consent or establish actual GUI enhancement.
 
-Full GUI consent plus playback, long-duration audio synchronization, mid-stream
+The user confirmed actual GUI installation and playback on 2026-09-10.
+Long-duration audio synchronization, mid-stream
 format changes, color fidelity, HDR and sustained performance still need manual
 or dedicated tests. The plugin does not expose interpolation or super-resolution.
+
+## Live NR controls
+
+Style (default/natural/cinema), intensity, local tone, local structure, automatic
+skin mask and skin structure are exposed. Numeric NR strengths accept 0..5,
+matching the pinned engine; skin structure is enabled when the mask is enabled.
+GPU/runtime changes require stopping enhancement. No inert depth, motion-vector,
+DLSS preset or upscaling controls are presented as working NR settings.
+
+`frames.update({settings: patch})` returns `applied`, `revision`, and effective
+settings after the worker acknowledges the update. Invalid controls return an
+`applied: false` result rather than terminating a healthy native session. Changes
+are serialized with frame processing, reset temporal history on the next frame,
+and retain the worker, GPU and shared buffers. Rebuilds inherit updated settings.
+The panel coalesces input over 150 ms and does not stop/reattach for adjustments.
+Paused playback applies settings to the next processed frame, not a cached frame.
+
+Evidence: 45 Python tests; `.local/plugin-live-ui-check/report.json` exercises live
+controls through the actual generated bridge with simulated replies;
+`.local/gpu1-live-update.json` records all five update groups changing actual NR
+pixels on the same GPU-1 worker (PID 81228), followed by lease reuse and cleanup.

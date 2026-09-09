@@ -26,6 +26,8 @@ class FrameService:
         self.generation = 0
         self.engine = 0
         self.error = None
+        self.lock = threading.RLock()
+        self.revision = 0
         self.stopping = threading.Event()
         self.connection = None
         self.listener = socket.socket()
@@ -44,6 +46,10 @@ class FrameService:
             self.session = None
 
     def _attach(self, request):
+        with self.lock:
+            return self._attach_locked(request)
+
+    def _attach_locked(self, request):
         if set(request) != {"op", "token", "width", "height"} or request["op"] != "attach":
             raise ValueError("expected frame attach")
         token = request["token"]
@@ -88,7 +94,8 @@ class FrameService:
                     raise ValueError("stale or invalid frame request")
                 reset = sequence == 0 or request["reset"]
                 sequence += 1
-                processed = self.session.process_shared(reset=reset)
+                with self.lock:
+                    processed = self.session.process_shared(reset=reset)
                 send_message(connection, {"generation": self.generation, "sequence": sequence,
                                            "processed": processed, "fallback": self.session.error})
         finally:
@@ -123,9 +130,28 @@ class FrameService:
             self.error = error
         finally:
             try:
-                self._close_session()
+                with self.lock:
+                    self._close_session()
             except Exception as error:
                 self.error = error
+
+    def update(self, settings):
+        # Serialize control RPC with frame IPC; never interleave pipe replies.
+        if not self.lock.acquire(timeout=1):
+            raise RuntimeError("frame worker is busy; retry settings update")
+        try:
+            if self.stopping.is_set():
+                raise RuntimeError("frame owner is stopping")
+            current = self.options.get("settings", {})
+            if settings.get("gpu_uuid", current.get("gpu_uuid")) != current.get("gpu_uuid"):
+                raise ValueError("stop enhancement before selecting another GPU")
+            if self.session is not None:
+                self.session.update(settings)
+            self.options = {**self.options, "settings": {**current, **settings}}
+            self.revision += 1
+            return {"applied": True, "revision": self.revision, "settings": self.options["settings"]}
+        finally:
+            self.lock.release()
 
     def close(self):
         self.stopping.set()

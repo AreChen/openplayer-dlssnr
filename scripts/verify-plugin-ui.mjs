@@ -52,6 +52,11 @@ function fixture(seed) {
         const { method } = m.args;
         if (method === "devices.list") result = devices;
         else if (method === "frames.status") result = { workerPid: f.attached ? 123 : null, device: f.attached ? devices[1] : null };
+        else if (method === "frames.update") {
+          f.updates = (f.updates || 0) + 1;
+          f.settings = m.args.params.settings;
+          result = { applied: true, revision: f.updates, settings: f.settings };
+        }
         else if (method === "runtime.inspect") result = { path: "E:/Runtime/nvngx_dlssnr.dll", sha256: "a".repeat(64) };
         else if (method !== "runtime.configure") throw new Error(`Unexpected native method ${method}`);
       } else if (!m.command.startsWith("plugin.log.") && m.command !== "ui.closePluginView") throw new Error(`Unexpected command ${m.command}`);
@@ -80,6 +85,17 @@ try {
   await page.locator("#start").click();
   await page.waitForFunction(() => document.getElementById("status").textContent === "增强已开启");
   assert(await page.locator("#gpu").isDisabled());
+  assert(await page.locator("#intensity").isEnabled());
+  const starts = await page.evaluate(() => window.fixture.calls.filter(c => c.command === "native.start").length);
+  await page.locator("#intensity").fill("2.5");
+  await page.locator("#style").selectOption("2");
+  await page.locator("#use_auto_mask").check();
+  await page.locator("#skin_struct").fill("1.5");
+  await page.waitForFunction(() => window.fixture.settings?.skin_struct === 1.5);
+  assert.equal(await page.evaluate(() => window.fixture.settings.style), 2);
+  assert.equal(await page.evaluate(() => window.fixture.settings.intensity), 2.5);
+  assert.equal(await page.evaluate(() => window.fixture.calls.filter(c => c.command === "native.start").length), starts);
+  assert.equal(await page.evaluate(() => window.fixture.calls.filter(c => c.command === "native.video.attach").length), 1);
   await page.screenshot({ path: path.join(output, "active-zh.png") });
   const saved = await page.evaluate(() => window.fixture.preferences);
   assert.equal(saved.gpuUuid, "GPU-1");
@@ -88,6 +104,8 @@ try {
   await page.setContent(document("en-US", saved));
   await page.waitForFunction(() => !document.getElementById("connect").disabled);
   assert.equal(await page.locator("#gpu").inputValue(), "GPU-1");
+  assert.equal(await page.locator("#intensity").inputValue(), "2.5");
+  assert.equal(await page.locator("#style").inputValue(), "2");
   await page.evaluate(() => { window.fixture.fail = true; });
   await page.locator("#start").click();
   await page.waitForFunction(() => document.getElementById("error").textContent.includes("Simulated"));

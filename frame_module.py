@@ -38,6 +38,17 @@ class FrameModule:
                 # Engine startup runs on first frame attachment, outside the SDK RPC.
                 self.owner = FrameService(self.factory, {**self.options, "settings": settings})
             return {"protocol": "openplayer-frame-experimental-v1", "endpoint": self.owner.endpoint}
+        if method == "frames.update":
+            try:
+                if set(params) != {"settings"} or not params["settings"]:
+                    raise ValueError("frames.update requires a non-empty settings patch")
+                settings = validate_settings(params["settings"])
+                if self.owner is None:
+                    raise ValueError("open the frame owner before updating settings")
+                return self.owner.update(settings)
+            except (ValueError, RuntimeError) as error:
+                # Invalid controls must not tear down an otherwise healthy session.
+                return {"applied": False, "error": str(error)}
         if params:
             raise ValueError("this frame method takes no parameters")
         if method == "frames.status":
@@ -45,7 +56,9 @@ class FrameModule:
             return {"running": self.owner is not None, "workerPid": session.worker_pid if session else None,
                     "device": session.device if session else None,
                     "error": session.error if session else None,
-                    "generation": self.owner.generation if self.owner else 0}
+                    "generation": self.owner.generation if self.owner else 0,
+                    "revision": self.owner.revision if self.owner else 0,
+                    "settings": self.owner.options.get("settings", {}) if self.owner else {}}
         if method == "frames.close":
             self.close()
             return None

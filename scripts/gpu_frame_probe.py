@@ -28,6 +28,7 @@ def main():
         source = np.random.default_rng(7).integers(0, 256, (720, 1280, 4), np.uint8)
         source[:, :, 3] = 255
         runs = []
+        updates = []
         for _ in range(2):
             with FrameClient(reply["endpoint"], 1280, 720) as client:
                 if client.device is None or client.device["uuid"] != gpu:
@@ -38,12 +39,29 @@ def main():
                     raise RuntimeError(f"frame processing failed: {client.error}")
                 runs.append({"workerPid": client.worker_pid, "reused": client.reused,
                              "device": client.device, "changedMean": changed})
+                if not client.reused:
+                    previous = output.copy()
+                    for settings in ({"intensity": 2}, {"style": 1}, {"local_tone": 2},
+                                     {"local_struct": 2}, {"use_auto_mask": True, "skin_struct": 2}):
+                        update = module.call("frames.update", {"settings": settings})
+                        if not update["applied"]:
+                            raise RuntimeError(update["error"])
+                        output = client.process(source, reset=True)
+                        delta = float(np.abs(previous.astype(np.int16) - output.astype(np.int16)).mean())
+                        status = module.call("frames.status", None)
+                        if client.error or status["workerPid"] != client.worker_pid or status["device"]["uuid"] != gpu:
+                            raise RuntimeError("live update failed or changed worker/GPU")
+                        updates.append({"settings": settings, "revision": update["revision"], "changedFromPrevious": delta,
+                                        "workerPid": client.worker_pid})
+                        previous = output.copy()
         if runs[0]["workerPid"] != runs[1]["workerPid"] or not runs[1]["reused"]:
             raise RuntimeError("same-GPU worker was not reused")
         module.call("frames.close", None)
         if module.call("frames.status", None)["running"]:
             raise RuntimeError("owner remained running")
-        report = {"passed": True, "runs": runs}
+        if not any(item["changedFromPrevious"] > 0 for item in updates):
+            raise RuntimeError("live updates produced no visible pixel change")
+        report = {"passed": True, "runs": runs, "updates": updates}
         with Path(os.environ["OPENPLAYER_GPU_REPORT"]).open("x", encoding="utf-8") as stream:
             json.dump(report, stream, indent=2)
         print(json.dumps(report), flush=True)

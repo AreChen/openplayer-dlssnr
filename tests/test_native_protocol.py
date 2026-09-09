@@ -48,7 +48,7 @@ class NativeProtocolTests(unittest.TestCase):
         module = FrameModule({}, factory=FakeProcessor)
         try:
             for method, params in (("unknown", None), ("frames.open", {"executable": "worker.exe"}),
-                                   ("frames.status", {"extra": 1}), ("frames.open", {"settings": {"intensity": 2}})):
+                                   ("frames.status", {"extra": 1}), ("frames.open", {"settings": {"intensity": 6}})):
                 with self.subTest(method=method, params=params), self.assertRaises(ValueError):
                     module.call(method, params)
             module.call("frames.open", None)
@@ -65,6 +65,35 @@ class NativeProtocolTests(unittest.TestCase):
             self.test_module_owns_worker_and_closes_active_client()
         finally:
             multiprocessing.set_executable(executable)
+
+    def test_live_updates_preserve_worker_buffers_and_reject_device_change(self):
+        module = FrameModule({}, factory=FakeProcessor)
+        frame = np.full((32, 64, 4), 48, np.uint8)
+        try:
+            self.assertFalse(module.call("frames.update", {"settings": {"style": 1}})["applied"])
+            reply = module.call("frames.open", None)
+            before = module.call("frames.update", {"settings": {"style": 2}})
+            self.assertEqual(before["revision"], 1)
+            with FrameClient(reply["endpoint"], 64, 32) as client:
+                pid = client.worker_pid
+                names = [m.name for m in client.memories]
+                client.process(frame)
+                updated = module.call("frames.update", {"settings": {"intensity": 3, "use_auto_mask": True}})
+                self.assertTrue(updated["applied"])
+                self.assertEqual(updated["revision"], 2)
+                np.testing.assert_array_equal(client.process(frame)[0, 0, :3], [101, 1, 200])
+                np.testing.assert_array_equal(client.process(frame)[0, 0, :3], [101, 0, 200])
+                for settings in ({"intensity": 6}, {"style": True}, {},
+                                 {"gpu_uuid": "GPU-76e0cbba-1c68-0d53-26ca-b999df6f0e9b"}):
+                    self.assertFalse(module.call("frames.update", {"settings": settings})["applied"])
+                status = module.call("frames.status", None)
+                self.assertEqual(status["revision"], 2)
+                self.assertEqual(status["workerPid"], pid)
+                self.assertEqual(names, [m.name for m in client.memories])
+                self.assertEqual(status["settings"]["style"], 2)
+                self.assertIsNone(client.error)
+        finally:
+            module.close()
 
     def test_module_owns_worker_and_closes_active_client(self):
         module = FrameModule({}, factory=FakeProcessor)

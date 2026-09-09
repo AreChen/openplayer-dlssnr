@@ -88,7 +88,7 @@ def stage(output, vapoursynth, host, plugin_ui=False):
                     "capabilities": [{"id": "native", "name": "Native frame processing", "kind": "nativeTool",
                                       "permissions": ["native.process"]}],
                     "nativeModules": [{"id": "enhance", "protocol": "openplayer-native-v1",
-                                       "methods": ["devices.list", "runtime.inspect", "runtime.configure", "frames.open", "frames.status", "frames.close"],
+                                       "methods": ["devices.list", "runtime.inspect", "runtime.configure", "frames.open", "frames.status", "frames.update", "frames.close"],
                                        "targets": {"windows-x86_64": {"entry": "runtime/python.exe",
                                            "sha256": executable_hash,
                                            "args": ["-I", "-B", "../app/bundled_frame_module.py"]}}}]}}
