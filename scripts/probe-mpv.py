@@ -56,7 +56,7 @@ def probe(args):
         if version_ptr:
             m.mpv_free(version_ptr)
         if args.video:
-            spec = f"vapoursynth=file=%{len(args.script.encode())}%{args.script}:concurrent-frames=1"
+            spec = args.filter or f"vapoursynth=file=%{len(args.script.encode())}%{args.script}:concurrent-frames=1"
             command = (c.c_char_p * 4)(b"vf", b"set", spec.encode(), None)
             commands["set_script"] = m.mpv_command(h, command)
             command = (c.c_char_p * 3)(b"loadfile", str(args.video.resolve()).encode(), None)
@@ -77,6 +77,7 @@ def main():
     parser.add_argument("library", type=Path)
     parser.add_argument("--video", type=Path)
     parser.add_argument("--script", default="tests/passthrough.vpy")
+    parser.add_argument("--filter", help="explicit developer filter graph instead of a script")
     parser.add_argument("--python-deps", type=Path)
     parser.add_argument("--timeout", type=float, default=12)
     parser.add_argument("--report", type=Path)

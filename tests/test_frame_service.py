@@ -85,6 +85,17 @@ class FrameServiceTests(unittest.TestCase):
                     FrameClient({**owner.endpoint, "token": token}, 64, 32)
             self.assertIsNone(owner.session)
 
+    def test_uhd_shared_buffers_preserve_dimensions(self):
+        with self.service() as owner:
+            with FrameClient(owner.endpoint, 3840, 2160) as client:
+                frame = np.full((2160, 3840, 4), 48, np.uint8)
+                output = client.process(frame)
+                self.assertEqual(output.shape, frame.shape)
+                self.assertEqual(output.dtype, frame.dtype)
+                np.testing.assert_array_equal(output[0, 0, :3], [100, 1, 200])
+                np.testing.assert_array_equal(output[-1, -1], frame[-1, -1])
+                self.assertIsNone(client.error)
+
     def test_timeout_disables_worker_without_stale_output(self):
         with self.service(options={"mode": "hang"}, timeout=.1) as owner:
             with FrameClient(owner.endpoint, 64, 32) as client:

@@ -103,7 +103,7 @@ class SessionTests(unittest.TestCase):
         self.assertEqual({p.pid for p in mp.active_children()}, before)
 
     def test_frame_and_dimension_validation(self):
-        for dimensions in ((0, 32), (1921, 32), (64.5, 32), (64, 1081)):
+        for dimensions in ((0, 32), (3841, 32), (64.5, 32), (64, 2161)):
             with self.assertRaises(ValueError):
                 FrameSession(*dimensions, FakeProcessor)
         with FrameSession(64, 32, FakeProcessor) as session:

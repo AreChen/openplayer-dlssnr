@@ -19,6 +19,8 @@ def main():
     parser.add_argument("--window-smoke", required=True, type=Path)
     parser.add_argument("--video", required=True, type=Path)
     parser.add_argument("--replacement-video", type=Path)
+    parser.add_argument("--normalize-sdr", action="store_true", help="exercise the host's explicit SDR input conversion")
+    parser.add_argument("--seek", type=float, default=.2, help="actual in-file seek position for scene inspection")
     parser.add_argument("--runtime", required=True, type=Path)
     parser.add_argument("--gpu", required=True, help="explicit NVIDIA GPU UUID; never a display ordinal")
     parser.add_argument("--report", required=True, type=Path)
@@ -38,9 +40,10 @@ def main():
     environment.update(PYTHONPATH="Z:/unused-python-path", PYTHONHOME="Z:/unused-python-home",
                        OPENPLAYER_SMOKE_MEDIA=str(args.video.resolve(strict=True)),
                        OPENPLAYER_SMOKE_RUNTIME_BUNDLE=str(bundle),
-                       OPENPLAYER_SMOKE_FRAME_OPTIONS=json.dumps({"settings": {"gpu_uuid": args.gpu, "intensity": .5}}),
+                       OPENPLAYER_SMOKE_FRAME_OPTIONS=json.dumps({"inputConversion": "sdr-bt709" if args.normalize_sdr else "none", "settings": {"gpu_uuid": args.gpu, "intensity": .5}}),
                        OPENPLAYER_SMOKE_NVIDIA_RUNTIME=str(args.runtime.resolve(strict=True)))
     config = Path(os.environ["APPDATA"]) / "vapoursynth/vapoursynth.toml"
+    environment["OPENPLAYER_SMOKE_SEEK_SECONDS"] = str(args.seek)
     if args.replacement_video:
         environment["OPENPLAYER_SMOKE_REPLACEMENT_MEDIA"] = str(args.replacement_video.resolve(strict=True))
     before = helpers["digest"](config) if config.exists() else None

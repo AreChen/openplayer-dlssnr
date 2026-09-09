@@ -38,9 +38,9 @@ class Processor:
 
 
 def create_filter(source, endpoint):
-    if (source.format is None or source.width > 1920 or source.height > 1080
+    if (source.format is None or source.width > 3840 or source.height > 2160
             or source.format.bits_per_sample != 8 or source.format.color_family != vs.YUV):
-        raise ValueError("adapter requires constant 8-bit SDR YUV up to 1080p")
+        raise ValueError("adapter requires constant 8-bit SDR YUV up to 3840x2160; convert HDR before attachment")
     rgb = vs.core.resize.Bicubic(source, format=vs.RGB24, matrix_in_s="709", range_in_s="limited")
     processor = Processor(source, endpoint)
     result = vs.core.std.ModifyFrame(rgb, clips=rgb, selector=processor.process)

@@ -2,15 +2,16 @@
 
 **Requires the current OpenPlayer host checkout, Windows x64 and a compatible
 NVIDIA GPU. Published 1.6.3 is insufficient despite sharing the development host's
-unchanged version number.** This is experimental 8-bit, limited-range BT.709 SDR
-processing up to 1080p, not a production release or a claim of real-time 1080p.
+unchanged version number.** This is experimental SDR processing up to 3840x2160,
+with optional HDR/Dolby Vision input conversion to SDR. It is not HDR passthrough
+or a claim of real-time 4K playback. Update the host as well as the plugin.
 
 ## Build
 
 With the prepared CPython 3.12/NumPy environment and native DLL:
 
 ```powershell
-rtk proxy .venv/Scripts/python.exe scripts/build-portable-module.py --vapoursynth .local/python/vapoursynth --host .local/build/dlssnr_host_v2.dll --output .local/plugin-ui --plugin-ui --archive .local/DLSSNR_0.2.0.opplugin
+rtk proxy .venv/Scripts/python.exe scripts/build-portable-module.py --vapoursynth .local/python/vapoursynth --host .local/build/dlssnr_host_v2.dll --output .local/plugin-ui --plugin-ui --archive .local/DLSSNR_0.3.0.opplugin
 ```
 
 Output paths must be new. `--plugin-ui` adds the plugin action, themed side panel,
@@ -35,6 +36,13 @@ Validate the staged directory with the sibling official repository's exported
 6. **Stop and release** terminates processing and its control process. Closing the
    panel alone keeps enhancement running. Switching media stops enhancement;
    re-enable explicitly for the next item.
+
+The compatibility checkbox enables the host's fixed SDR input normalization.
+Already-compatible SDR bypasses it. For Profile 5, the host first downloads 10-bit
+hardware frames, then libplacebo interprets RPU metadata and produces BT.709 SDR
+before NR. Turning the checkbox off restores the SDR-only input requirement.
+Conversion keeps the input resolution; a 3840x1606 source remains 3840x1606.
+NR GPU selection does not select the independent mpv color-conversion GPU.
 
 GPU UUID, runtime path and all NR settings persist through SDK storage in host redb.
 The active device identity is shown separately from the saved selection. A missing
@@ -94,3 +102,36 @@ Evidence: 45 Python tests; `.local/plugin-live-ui-check/report.json` exercises l
 controls through the actual generated bridge with simulated replies;
 `.local/gpu1-live-update.json` records all five update groups changing actual NR
 pixels on the same GPU-1 worker (PID 81228), followed by lease reuse and cleanup.
+
+## Dolby Vision evidence and limits
+
+The user's episode is HEVC 3840x1606, full-range 10-bit, Dolby Vision Profile 5
+with RPU and no HDR10-compatible base layer. It must not be interpreted as ordinary
+BT.2020/PQ YUV. The host uses FFmpeg's documented
+[libplacebo DV conversion](https://ffmpeg.org/ffmpeg-filters.html#libplacebo),
+which applies and strips RPU metadata before the SDR processor sees pixels.
+
+`.local/dv-profile5-batched.json` verifies that exact source through the public
+attachment command. The test seeks to 180 seconds and waits for seeking to finish,
+SDR output metadata and time advancement. The scene screenshot has the original
+3840x1606 dimensions; stopping removes all conversion/NR labels and restores
+original Dolby Vision playback without changing user configuration.
+
+Earlier `.local/dv-profile5-scene.json` captured too early during a multi-second
+seek and showed the old intro frame. The stronger readiness check replaced fixed
+sleeps; that earlier nonblank-image check was not proof of correct seek output.
+4K CPU transport, conversion and inference remain too costly to promise 25 FPS;
+the test observed A/V lag. Formal colorimetric validation and long playback tests
+remain outstanding. No forced downscaling or fake HDR-preservation flag is used.
+
+Final 0.3.0 package evidence: `sdr-1080-final-package.json` passes the unchanged
+SDR path; `dv-profile5-final-package.json` passes uninstall but fails its separate
+180-second seek/exit run because seeking exceeds the eight-second readiness gate.
+`dv-profile5-final-exit.json` then independently passes active-enhancement exit
+with the ordinary near-start seek. Do not summarize this as all 4K timing tests
+passing. The Windows test host is `.local/openplayer-nr-test-0.3.0/` and the plugin
+is `.local/DLSSNR_0.3.0.opplugin` (SHA256
+`184331d50b893ca3827a673bdc0dae455813214b6f985c38fe0658b143f0b299`).
+The host has 207 passing Rust tests (three explicitly gated tests ignored), the
+plugin has 46 passing Python tests, and the SDK has 48 passing tests plus type
+checks. The final UI bridge test is `.local/plugin-0.3.0-ui-check/report.json`.

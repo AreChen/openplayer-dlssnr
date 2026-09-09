@@ -62,8 +62,8 @@ class FrameSession:
     def __init__(self, width, height, factory, options=None, *, timeout=3.0,
                  startup_timeout=30.0, fallback=True):
         if (type(width) is not int or type(height) is not int
-                or not 16 <= width <= 1920 or not 16 <= height <= 1080):
-            raise ValueError("prototype supports integer dimensions 16..1920 x 16..1080")
+                or not 16 <= width <= 3840 or not 16 <= height <= 2160):
+            raise ValueError("prototype supports integer dimensions 16..3840 x 16..2160")
         for value in (timeout, startup_timeout):
             if not math.isfinite(value) or not 0 < value <= 120:
                 raise ValueError("timeouts must be finite and in (0, 120]")

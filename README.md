@@ -5,7 +5,8 @@ DLSSNR. **An installable development plugin is now available; published OpenPlay
 1.6.3 cannot run it.** The current host checkout exposes permissioned single-stage
 video attachment. See [build and test the plugin](docs/plugin-ui.md) for the GPU
 selector, runtime selection and enhancement controls. No window capture or
-replacement renderer is used. Full GUI launch consent remains a manual test.
+replacement renderer is used. Installation grants declared permissions without
+repeat launch prompts. The user confirmed GUI installation and playback.
 
 ## What works
 
@@ -24,9 +25,15 @@ replacement renderer is used. Full GUI launch consent remains a manual test.
 - The development plugin view uses host theme components and redb storage. GPU choice is explicit and persists UUID, never a default display ordinal. Browser tests exercise the real generated view bridge with simulated host replies.
 
 This prototype uses CPU frame buffers with GPU upload/readback, **not zero-copy
-GPU textures**. It is single-caller, synchronous, limited to 1920x1080 and one
+GPU textures**. It is single-caller, synchronous, limited to 3840x2160 and one
 in-flight frame. Process isolation limits native crashes; it is not a security
 sandbox for untrusted native code. All processor factories are trusted local code.
+
+Version 0.3.0 adds live style/intensity/local-tone/structure/skin-mask controls.
+HDR/Dolby Vision compatibility uses the host's libplacebo conversion **to SDR**,
+preserving resolution but not HDR output. Native-resolution 4K is expensive:
+multi-second seeks and A/V lag were observed; real-time 4K is not established.
+See [plugin operation and evidence](docs/plugin-ui.md).
 
 ## Run the tests
 

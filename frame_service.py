@@ -56,7 +56,7 @@ class FrameService:
         if not isinstance(token, str) or not token.isascii() or not hmac.compare_digest(token, self.endpoint["token"]):
             raise ValueError("invalid frame owner token")
         width, height = request["width"], request["height"]
-        if type(width) is not int or type(height) is not int or not 16 <= width <= 1920 or not 16 <= height <= 1080:
+        if type(width) is not int or type(height) is not int or not 16 <= width <= 3840 or not 16 <= height <= 2160:
             raise ValueError("unsupported frame dimensions")
         reused = self.session is not None and self.dimensions == (width, height)
         if not reused:
