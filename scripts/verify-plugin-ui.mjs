@@ -74,9 +74,10 @@ try {
   const page = await browser.newPage({ viewport: { width: 420, height: 720 } });
   page.on("pageerror", (e) => errors.push(e.message));
   await page.setContent(document("zh-CN"));
-  await page.waitForFunction(() => !document.getElementById("connect").disabled);
+  await page.waitForFunction(() => !document.getElementById("gpu").disabled);
   assert.equal(await page.locator("#gpu").inputValue(), "");
-  await page.locator("#connect").click();
+  assert.equal(await page.locator("#connect").count(), 0);
+  assert(await page.locator("#retry").isHidden());
   await page.waitForFunction(() => !document.getElementById("gpu").disabled);
   assert.equal(await page.locator("#gpu").inputValue(), "", "never select the first GPU automatically");
   await page.locator("#gpu").selectOption("GPU-1");
@@ -102,7 +103,8 @@ try {
   await page.locator("#stop").click();
   await page.waitForFunction(() => !window.fixture.running && !document.getElementById("start").disabled);
   await page.setContent(document("en-US", saved));
-  await page.waitForFunction(() => !document.getElementById("connect").disabled);
+  await page.waitForFunction(() => !document.getElementById("gpu").disabled);
+  assert(!await page.locator("#gpu").textContent().then(text => text.includes("unavailable")));
   assert.equal(await page.locator("#gpu").inputValue(), "GPU-1");
   assert.equal(await page.locator("#intensity").inputValue(), "2.5");
   assert.equal(await page.locator("#style").inputValue(), "2");
@@ -119,6 +121,32 @@ try {
     assert.deepEqual(overflow, []);
     await page.locator("#error").scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(output, `error-en-${size.width}.png`) });
+  }
+  // Execute the real host geometry hook against actual layout, including resize.
+  const insetsHook = ts.transpileModule(fs.readFileSync(path.join(host, "src/hooks/usePluginPanelInsets.ts"), "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const shellCss = ["dialogs.css", "transport/layout.css", "shell/window-controls.css"]
+    .map(file => fs.readFileSync(path.join(host, "src/styles", file), "utf8")).join("\n");
+  await page.setContent(`<style>${shellCss}body{margin:0}.stage{position:relative;height:100vh}.transport{height:96px}</style>
+    <section class="stage"><div class="window-controls"><button>X</button></div><div class="transport"></div>
+    <section class="plugin-view-shell plugin-view-shell--sidePanel" style="background:#202326"></section></section>`);
+  await page.evaluate(code => {
+    const exports = {};
+    new Function("exports", "require", code)(exports, () => ({
+      useRef: () => ({ current: document.querySelector(".plugin-view-shell") }),
+      useLayoutEffect: callback => callback(),
+    }));
+    exports.usePluginPanelInsets(true);
+  }, insetsHook);
+  for (const size of [{ width: 1280, height: 720 }, { width: 640, height: 480 }, { width: 1920, height: 1080 }]) {
+    await page.setViewportSize(size);
+    await page.waitForFunction(() => {
+      const bounds = selector => document.querySelector(selector).getBoundingClientRect();
+      const panel = bounds(".plugin-view-shell"), chrome = bounds(".window-controls"), transport = bounds(".transport");
+      return panel.top >= chrome.bottom + 11 && panel.bottom <= transport.top - 11;
+    });
+    await page.screenshot({ path: path.join(output, `shell-${size.width}.png`) });
   }
   assert.deepEqual(errors, []);
   fs.writeFileSync(path.join(output, "report.json"), JSON.stringify({ passed: true, simulatedHost: true, gpuWork: false, assertions: ["explicit GPU selection", "storage restore", "shared filesystem bridge", "enable/stop", "failure cleanup", "persistent error", "responsive layout"], pageErrors: errors }, null, 2));

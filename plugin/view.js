@@ -2,7 +2,7 @@
 (() => {
   const api = window.openplayer;
   const t = String(api.locale).startsWith("zh") ? {
-    close: "关闭", gpu: "处理显卡", connect: "读取显卡", runtime: "NR 运行时 DLL", browse: "选择 DLL 所在目录",
+    close: "关闭", gpu: "处理显卡", loading: "正在检测显卡…", retry: "重试检测", detectionFailed: "显卡检测失败", runtime: "NR 运行时 DLL", browse: "选择 DLL 所在目录",
     style: "风格", standard: "默认", natural: "自然", cinema: "电影", local_tone: "局部色调", local_struct: "局部结构",
     skin_struct: "肤色结构", use_auto_mask: "自动肤色蒙版", applied: "参数已应用",
     sdr: "兼容模式：HDR / 杜比视界转 SDR", output: "增强输出：SDR · 保持原分辨率",
@@ -10,7 +10,7 @@
     active: "增强已开启", waiting: "等待首帧", select: "请选择处理显卡和 NR 运行时。", unavailable: "当前播放器不支持原生视频挂载。",
     failed: "视频处理未能启动，请检查媒体格式与运行时。", savedMissing: "已保存的显卡当前不可用", stopped: "原生模块已停止",
   } : {
-    close: "Close", gpu: "Processing GPU", connect: "List GPUs", runtime: "NR runtime DLL", browse: "Choose DLL directory",
+    close: "Close", gpu: "Processing GPU", loading: "Detecting GPUs…", retry: "Retry detection", detectionFailed: "GPU detection failed", runtime: "NR runtime DLL", browse: "Choose DLL directory",
     style: "Style", standard: "Default", natural: "Natural", cinema: "Cinema", local_tone: "Local tone", local_struct: "Local structure",
     skin_struct: "Skin structure", use_auto_mask: "Automatic skin mask", applied: "Settings applied",
     sdr: "Compatibility: HDR / Dolby Vision to SDR", output: "Enhancement output: SDR · Original resolution",
@@ -21,6 +21,7 @@
   const $ = (id) => document.getElementById(id);
   for (const node of document.querySelectorAll("[data-text]")) node.textContent = t[node.dataset.text];
   let busy = false, running = false, attached = false, devices = [];
+  let deviceState = "loading";
   const defaults = { style: 0, intensity: 0.5, local_tone: 1, local_struct: 1, skin_struct: 0.5, use_auto_mask: false };
   const parameters = Object.keys(defaults);
   let preferences = { gpuUuid: "", runtimePath: "", normalizeSdr: true, ...defaults };
@@ -35,18 +36,21 @@
     }
   }
   function controls() {
-    for (const id of ["connect", "browse", "gpu", "runtime", "normalizeSdr", "start"]) $(id).disabled = busy || attached;
+    for (const id of ["retry", "browse", "gpu", "runtime", "normalizeSdr", "start"]) $(id).disabled = busy || attached;
+    $("gpu").disabled ||= deviceState !== "ready";
+    $("start").disabled ||= deviceState !== "ready";
     for (const id of parameters) $(id).disabled = busy && !attached;
     $("skin_struct").disabled ||= !$("use_auto_mask").checked;
     $("stop").disabled = busy || !running;
   }
   function renderDevices() {
-    $("gpu").replaceChildren(new Option(t.choose, ""));
+    $("gpu").replaceChildren(new Option(deviceState === "loading" ? t.loading : deviceState === "failed" ? t.detectionFailed : t.choose, ""));
     for (const device of devices) $("gpu").add(new Option(`PCI ${device.pciBusId} | ${device.name}`, device.uuid));
-    if (preferences.gpuUuid && !devices.some((d) => d.uuid === preferences.gpuUuid)) {
+    if (deviceState === "ready" && preferences.gpuUuid && !devices.some((d) => d.uuid === preferences.gpuUuid)) {
       $("gpu").add(new Option(`${t.savedMissing}: ${preferences.gpuUuid}`, preferences.gpuUuid));
     }
-    $("gpu").value = preferences.gpuUuid;
+    if (deviceState === "ready") $("gpu").value = preferences.gpuUuid;
+    $("retry").hidden = deviceState !== "failed";
   }
   async function save(settings = readSettings()) {
     preferences = { gpuUuid: $("gpu").value, runtimePath: $("runtime").value.trim(), normalizeSdr: $("normalizeSdr").checked, ...settings };
@@ -74,12 +78,17 @@
     }
     controls();
   }
-  $("connect").onclick = () => action(async () => {
-    await api.native.start("enhance");
-    running = true;
-    devices = await api.native.call("enhance", "devices.list");
-    renderDevices();
-  });
+  async function detectDevices() {
+    deviceState = "loading"; renderDevices(); controls();
+    try {
+      await api.native.start("enhance");
+      running = true;
+      devices = await api.native.call("enhance", "devices.list");
+      deviceState = "ready";
+    } catch (error) { deviceState = "failed"; throw error; }
+    finally { renderDevices(); }
+  }
+  $("retry").onclick = () => action(detectDevices);
   $("browse").onclick = () => action(async () => {
     const directory = await api.filesystem.pickDirectory();
     if (directory) { $("runtime").value = directory.replace(/[\\/]+$/, "") + "/nvngx_dlssnr.dll"; await save(); }
@@ -141,7 +150,7 @@
     amounts();
     renderDevices();
     await refresh();
-    if (running) { devices = await api.native.call("enhance", "devices.list"); renderDevices(); }
+    await detectDevices();
   }
   action(initialize);
   const timer = setInterval(() => {

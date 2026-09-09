@@ -26,7 +26,9 @@ Validate the staged directory with the sibling official repository's exported
 1. Build the current host frontend and desktop executable. A test build can use
    `TAURI_CONFIG` with a separate application identifier to isolate settings.
 2. Import the `.opplugin` through Plugins settings and open an eligible video.
-3. Open **DLSSNR** from the player controls. Choose **List GPUs**. Installation
+3. Open **DLSSNR** from the player controls. GPU detection runs automatically.
+   Saved UUIDs are resolved after enumeration, not reported missing while loading.
+   Failed detection offers a retry button. Installation
    grants declared permissions; the current host does not repeat launch prompts.
 4. Select the processing GPU explicitly. The options show PCI bus first so
    identically named cards remain distinguishable. No GPU is selected by default.
