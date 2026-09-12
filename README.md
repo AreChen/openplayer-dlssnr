@@ -1,12 +1,19 @@
-# OpenPlayer DLSSNR prototype
+# OpenPlayer DLSSNR Plugin
 
-Independent, Windows-only experiment for processing SDR video frames with
-DLSSNR. **An installable development plugin is now available; published OpenPlayer
-1.6.3 cannot run it.** The current host checkout exposes permissioned single-stage
-video attachment. See [build and test the plugin](docs/plugin-ui.md) for the GPU
-selector, runtime selection and enhancement controls. No window capture or
-replacement renderer is used. Installation grants declared permissions without
-repeat launch prompts. The user confirmed GUI installation and playback.
+An optional, experimental **plugin for [OpenPlayer](https://github.com/AreChen/OpenPlayer)**,
+not a standalone player or an official NVIDIA product. Requires **OpenPlayer
+1.6.4 or later, Windows x64 and a compatible NVIDIA GPU**.
+
+Download the `.opplugin` from [Releases](https://github.com/AreChen/openplayer-dlssnr/releases),
+install it in OpenPlayer's plugin settings, then open DLSSNR from player controls.
+Select the processing GPU and a trusted local `nvngx_dlssnr.dll` before enabling.
+**NVIDIA's runtime DLL and SDK are not bundled.** The default 15 FPS cap reduces
+motion cadence to keep processing sustainable; audio speed stays unchanged.
+
+This uses the host's native video attachment, not window capture or a replacement
+renderer. Installation grants declared permissions without repeat launch prompts.
+Native code is trusted, not sandboxed. See [plugin operation](docs/plugin-ui.md)
+and [third-party boundaries](THIRD_PARTY_NOTICES.md).
 
 ## What works
 

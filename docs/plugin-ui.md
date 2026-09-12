@@ -1,8 +1,7 @@
 # Build and test the development plugin
 
-**Requires the current OpenPlayer host checkout, Windows x64 and a compatible
-NVIDIA GPU. Published 1.6.3 is insufficient despite sharing the development host's
-unchanged version number.** This is experimental SDR processing up to 3840x2160,
+**Requires OpenPlayer 1.6.4, Windows x64 and a compatible NVIDIA GPU.**
+OpenPlayer 1.6.3 is insufficient. This is experimental SDR processing up to 3840x2160,
 with optional HDR/Dolby Vision input conversion to SDR. It is not HDR passthrough
 or a claim of real-time 4K playback. Update the host as well as the plugin.
 
