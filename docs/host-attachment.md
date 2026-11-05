@@ -41,6 +41,11 @@ processed/recovered screenshots, native close markers, zero job processes,
 generated-script cleanup and unchanged source/user configuration. A disabled mpv
 filter fails the runner even if original playback continued. Timeouts retain
 partial stdout/stderr for diagnosis.
+Add `--realtime --require-smooth` to measure playback for 20 seconds and fail
+when video output drops exceed 5% of processed frames, with a minimum allowance
+of 10 frames. Use a display whose refresh rate meets or exceeds the tested frame
+rate; intentional display-rate conversion otherwise affects the drop count.
+This short sample is not a guarantee of sustained performance.
 The `app-exit` case retains the active attachment until normal application
 shutdown, then checks session/job/script cleanup. Other cases also require a
 recovered screenshot. Every case requires the native event loop to return before

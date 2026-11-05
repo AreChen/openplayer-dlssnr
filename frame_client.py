@@ -1,5 +1,6 @@
 """Short-lived filter lease onto a long-lived trusted frame service."""
 from multiprocessing.shared_memory import SharedMemory
+import math
 import socket
 import time
 
@@ -34,6 +35,13 @@ class FrameClient:
             self.worker_pid = reply["worker_pid"]
             self.engine = reply["engine"]
             self.device = reply.get("device")
+            self.adaptive = reply.get("adaptive", False)
+            if type(self.adaptive) is not bool:
+                raise ProcessorError("invalid adaptive frame policy")
+            self.playback_speed = reply.get("playback_speed", 1.0)
+            if (type(self.playback_speed) not in (int, float) or not math.isfinite(self.playback_speed)
+                    or not .01 <= self.playback_speed <= 100):
+                raise ProcessorError("invalid adaptive playback speed")
             self.reused = reply["reused"]
             self.startup_ms = reply["startup_ms"]
             for name in reply["buffers"]:

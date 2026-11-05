@@ -35,6 +35,7 @@ def main():
         runs = []
         updates = []
         timings = []
+        planar_timings = []
         for _ in range(2):
             with FrameClient(reply["endpoint"], width, height) as client:
                 if client.device is None or client.device["uuid"] != gpu:
@@ -54,6 +55,16 @@ def main():
                             raise RuntimeError(f"timed frame failed: {client.error}")
                         if index >= 5:
                             timings.append(elapsed * 1000)
+                    source_planes = [np.ascontiguousarray(source[:, :, channel]) for channel in range(3)]
+                    output_planes = [np.empty((height, width), dtype=np.uint8) for _ in range(3)]
+                    for index in range(65):
+                        started = time.perf_counter()
+                        processed = client.process_into(source_planes, output_planes)
+                        elapsed = time.perf_counter() - started
+                        if not processed or client.error:
+                            raise RuntimeError(f"timed planar frame failed: {client.error}")
+                        if index >= 5:
+                            planar_timings.append(elapsed * 1000)
                     previous = output.copy()
                     for settings in ({"intensity": 2}, {"style": 1}, {"local_tone": 2},
                                      {"local_struct": 2}, {"use_auto_mask": True, "skin_struct": 2}):
@@ -78,6 +89,8 @@ def main():
         report = {"passed": True, "preset": preset, "width": width, "height": height,
                   "runtimeSha256": digest, "frameMsMedian": statistics.median(timings),
                   "frameMsMean": statistics.mean(timings), "timedFrames": len(timings),
+                  "planarFrameMsMedian": statistics.median(planar_timings),
+                  "planarFrameMsMean": statistics.mean(planar_timings),
                   "runs": runs, "updates": updates}
         with Path(os.environ["OPENPLAYER_GPU_REPORT"]).open("x", encoding="utf-8") as stream:
             json.dump(report, stream, indent=2)

@@ -46,7 +46,7 @@ int wmain(int argc, wchar_t** argv) {
         if (!CreateProcessW(argv[2], line.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
             nullptr, nullptr, &startup, &child)) return 7;
         CloseHandle(child.hThread);
-        if (WaitForSingleObject(child.hProcess, 45000) != WAIT_OBJECT_0) return 8;
+        if (WaitForSingleObject(child.hProcess, 65000) != WAIT_OBJECT_0) return 8;
         DWORD exitCode = 0;
         GetExitCodeProcess(child.hProcess, &exitCode);
         CloseHandle(child.hProcess);

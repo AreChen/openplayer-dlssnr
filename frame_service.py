@@ -5,6 +5,7 @@ its processor package. Loopback plus a per-owner token prevents accidental joins
 this is trusted local software, not an OS sandbox or a multi-tenant service.
 """
 import hmac
+import math
 import secrets
 import select
 import socket
@@ -15,9 +16,15 @@ from frame_wire import receive_message, send_message
 
 
 class FrameService:
-    def __init__(self, factory, options=None, *, log=None, timeout=.5, startup_timeout=5):
+    def __init__(self, factory, options=None, *, log=None, timeout=.5, startup_timeout=5, adaptive=False, playback_speed=1.0):
+        if type(adaptive) is not bool:
+            raise ValueError("adaptive must be boolean")
+        if type(playback_speed) not in (int, float) or not math.isfinite(playback_speed) or not .01 <= playback_speed <= 100:
+            raise ValueError("invalid adaptive playback speed")
         self.factory = factory
         self.options = options or {}
+        self.adaptive = adaptive
+        self.playback_speed = playback_speed
         self.log = log or (lambda *_args, **_kwargs: None)
         self.timeout = timeout
         self.startup_timeout = startup_timeout
@@ -73,7 +80,8 @@ class FrameService:
                  "width": width, "height": height, "worker_pid": self.session.worker_pid,
                  "engine": self.engine, "reused": reused,
                  "startup_ms": 0 if reused else self.session.startup_ms,
-                 "device": self.session.device}
+                 "device": self.session.device, "adaptive": self.adaptive,
+                 "playback_speed": self.playback_speed}
         self.log("attach", **{key: value for key, value in reply.items() if key != "buffers"})
         return reply
 

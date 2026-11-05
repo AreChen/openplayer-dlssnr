@@ -28,6 +28,7 @@ function load(file) {
   return module.exports;
 }
 const { buildPluginViewDocument } = load(path.join(host, "src/app/pluginRuntime/viewDocument.ts"));
+const hostConstants = load(path.join(host, "src/app/pluginRuntime/constants.ts"));
 const template = fs.readFileSync("plugin/view.html", "utf8"), script = fs.readFileSync("plugin/view.js", "utf8");
 const theme = { surface: "#141618", panel: "#202326", panelStrong: "#292d31", text: "#f0f2f4", muted: "#b0b7bf", faint: "#7c858e", accent: "#62c5ac", danger: "#e47777", line: "#3d444b", control: "#30363c" };
 function fixture(seed, options) {
@@ -48,7 +49,9 @@ function fixture(seed, options) {
       else if (m.command === "native.video.attach") {
         if (f.fail) throw new Error("Simulated attachment failure");
         if (m.args.options.settings.gpu_uuid !== "GPU-1") throw new Error("GPU 0 must not be selected by default");
-        if (m.args.options.frameRateLimit !== 15) throw new Error("expected saved frame rate limit");
+        if (m.args.options.frameRateLimit !== (options.sourceRate ? (options.legacy ? 30 : undefined) : 15)) throw new Error("expected saved frame rate limit");
+        if (m.args.options.adaptive !== (options.sourceRate ? true : undefined)) throw new Error("incorrect adaptive frame policy");
+        if (m.args.options.autoFrameRate !== (options.sourceRate && !options.legacy ? true : undefined)) throw new Error("incorrect host calibration request");
         if (m.args.options.settings.preset !== f.expectedPreset) throw new Error("incorrect model preset");
         f.attached = true;
       } else if (m.command === "native.call") {
@@ -73,7 +76,13 @@ function fixture(seed, options) {
 }
 function document(locale, seed = null, options = {}) {
   const html = template.replace("<!-- SCRIPT -->", `<script>(${fixture.toString()})(${JSON.stringify(seed)},${JSON.stringify(options)});${script}</script>`);
-  return buildPluginViewDocument(html, { id: "test.dlssnr", permissions: ["native.process", "native.video", "filesystem.pick"] }, locale, theme);
+  const capabilities = hostConstants.OPENPLAYER_HOST_CAPABILITIES;
+  try {
+    if (options.legacy) hostConstants.OPENPLAYER_HOST_CAPABILITIES = capabilities.filter(value => value !== "native.video.autoFrameRate");
+    return buildPluginViewDocument(html, { id: "test.dlssnr", permissions: ["native.process", "native.video", "filesystem.pick"] }, locale, theme);
+  } finally {
+    hostConstants.OPENPLAYER_HOST_CAPABILITIES = capabilities;
+  }
 }
 const browser = await chromium.launch({ headless: true, channel: values.channel });
 const errors = [];
@@ -139,6 +148,22 @@ try {
   assert.equal(await page.locator("#modelPreset").inputValue(), "2");
   await page.locator("#start").click();
   await page.waitForFunction(() => document.getElementById("status").textContent === "Enhancement active");
+  await page.locator("#stop").click();
+  await page.waitForFunction(() => !window.fixture.running && !document.getElementById("start").disabled);
+  await page.setContent(document("en-US", { ...saved, frameRateLimit: 0 }, { sourceRate: true }));
+  await page.waitForFunction(() => !document.getElementById("gpu").disabled);
+  await page.locator("#start").click();
+  await page.waitForFunction(() => document.getElementById("status").textContent === "Enhancement active");
+  assert.equal(await page.evaluate(() => window.fixture.calls.find(c => c.command === "native.video.attach").args.options.frameRateLimit), undefined);
+  assert.equal(await page.evaluate(() => window.fixture.calls.find(c => c.command === "native.video.attach").args.options.adaptive), true);
+  assert.equal(await page.evaluate(() => window.fixture.calls.find(c => c.command === "native.video.attach").args.options.autoFrameRate), true);
+  await page.locator("#stop").click();
+  await page.waitForFunction(() => !window.fixture.running && !document.getElementById("start").disabled);
+  await page.setContent(document("en-US", { ...saved, frameRateLimit: 0 }, { sourceRate: true, legacy: true }));
+  await page.waitForFunction(() => !document.getElementById("gpu").disabled);
+  await page.locator("#start").click();
+  await page.waitForFunction(() => document.getElementById("status").textContent === "Enhancement active");
+  assert.equal(await page.evaluate(() => window.fixture.calls.find(c => c.command === "native.video.attach").args.options.frameRateLimit), 30);
   await page.locator("#stop").click();
   await page.waitForFunction(() => !window.fixture.running && !document.getElementById("start").disabled);
   await page.setContent(document("en-US", saved));

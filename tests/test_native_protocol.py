@@ -3,11 +3,12 @@ import json
 import multiprocessing.spawn
 import sys
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
 from frame_client import FrameClient
-from frame_module import FrameModule, configure_worker_executable
+from frame_module import FrameModule, configure_worker_executable, rate_from_timings
 from native_protocol import MAX_MESSAGE, serve
 from test_session import FakeProcessor
 
@@ -56,6 +57,47 @@ class NativeProtocolTests(unittest.TestCase):
                 module.call("frames.open", {"settings": {"intensity": .25}})
         finally:
             module.close()
+
+    def test_calibration_returns_bounded_limit_and_reuses_owner(self):
+        module = FrameModule({}, factory=FakeProcessor)
+        probe = {"width": 64, "height": 32, "frameRate": 60.0, "speed": 1.0}
+        try:
+            with patch("frame_module.calibrate_frame_rate", return_value=35.0) as calibrate:
+                reply = module.call("frames.open", {"adaptive": True, "frameRateProbe": probe})
+                self.assertEqual(reply["frameRateLimit"], 35.0)
+                self.assertEqual(module.call("frames.status", None)["profiledFrameRate"], 35.0)
+                self.assertEqual(module.call("frames.open", {"adaptive": True, "frameRateProbe": probe}), reply)
+                calibrate.assert_called_once()
+        finally:
+            module.close()
+
+    def test_calibration_rejects_invalid_metadata(self):
+        module = FrameModule({}, factory=FakeProcessor)
+        try:
+            for probe in (None, {}, {"width": True, "height": 32, "frameRate": 60, "speed": 1},
+                          {"width": 7680, "height": 32, "frameRate": 60, "speed": 1},
+                          {"width": 64, "height": 32, "frameRate": 60, "speed": 0}):
+                with self.subTest(probe=probe), self.assertRaises(ValueError):
+                    module.call("frames.open", {"adaptive": True, "frameRateProbe": probe})
+        finally:
+            module.close()
+
+    def test_calibration_rate_has_headroom_and_respects_source_and_speed(self):
+        self.assertEqual(rate_from_timings([.015] * 12, {"speed": 1, "frameRate": 60}), 40)
+        self.assertEqual(rate_from_timings([.015] * 12, {"speed": 2, "frameRate": 60}), 20)
+        self.assertEqual(rate_from_timings([.005] * 12, {"speed": 1, "frameRate": 24}), 24)
+        self.assertEqual(rate_from_timings([.001] * 12, {"speed": 1, "frameRate": None}), 120)
+        self.assertEqual(rate_from_timings([.015] * 12, {"speed": 1, "frameRate": .5}), 1)
+        with self.assertRaises(RuntimeError):
+            rate_from_timings([0] * 12, {"speed": 1, "frameRate": 60})
+
+    def test_calibration_failure_closes_owner(self):
+        module = FrameModule({}, factory=FakeProcessor)
+        probe = {"width": 64, "height": 32, "frameRate": 60.0, "speed": 1.0}
+        with patch("frame_module.calibrate_frame_rate", side_effect=RuntimeError("failed")):
+            with self.assertRaisesRegex(RuntimeError, "failed"):
+                module.call("frames.open", {"adaptive": True, "frameRateProbe": probe})
+        self.assertIsNone(module.owner)
 
     @unittest.skipUnless(sys.platform == "win32", "Windows windowless runtime")
     def test_windowless_worker(self):

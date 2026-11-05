@@ -1,5 +1,7 @@
 """Private SDR adapter for a host-owned native frame session, not a public SDK."""
 import json
+import math
+import time
 import numpy as np
 import vapoursynth as vs
 
@@ -11,15 +13,54 @@ class Processor:
         self.client = FrameClient(endpoint, source.width, source.height)
         self.last = None
         self.reported = False
+        self.cached = None
+        self.cost = None
+        self.phase = 0.0
+        self.adaptive = self.client.adaptive is True
+        speed = getattr(self.client, "playback_speed", 1.0)
+        self.playback_speed = speed if type(speed) in (int, float) and math.isfinite(speed) and speed > 0 else 1.0
+        try:
+            duration = float(source.fps_den) / float(source.fps_num)
+            self.fallback_duration = duration if math.isfinite(duration) and 1 / 240 <= duration <= 10 else 1 / 60
+        except (AttributeError, TypeError, ValueError, ZeroDivisionError):
+            self.fallback_duration = 1 / 60
+
+    def _duration(self, frame):
+        try:
+            duration = float(frame.props["_DurationNum"]) / float(frame.props["_DurationDen"])
+            return duration if math.isfinite(duration) and 1 / 240 <= duration <= 10 else self.fallback_duration
+        except (KeyError, TypeError, ValueError, ZeroDivisionError):
+            return self.fallback_duration
 
     def process(self, n, f):
         frame = f
         if frame.props.get("_Transfer", 2) in (16, 18):
             raise ValueError("HDR is not supported by this SDR adapter")
+        reset = self.last is None or n != self.last + 1
+        duration = self._duration(frame)
+        if self.adaptive and not reset and self.cached is not None and self.cost and duration:
+            # Match the startup calibration budget, leaving time for the host pipeline.
+            self.phase += min(1.0, duration * .6 / (self.cost * self.playback_speed))
+            if self.phase < 1.0:
+                result = self.cached.copy()
+                result.props.clear()
+                result.props.update(frame.props)
+                self.last = n
+                return result
+            self.phase -= 1.0
+        elif reset:
+            self.phase = 0.0
         result = frame.copy()
         source = [np.asarray(frame[channel]) for channel in range(3)]
         output = [np.asarray(result[channel]) for channel in range(3)]
-        processed = self.client.process_into(source, output, reset=self.last is None or n != self.last + 1)
+        started = time.perf_counter()
+        processed = self.client.process_into(source, output, reset=reset)
+        elapsed = time.perf_counter() - started
+        if processed and self.adaptive:
+            self.cost = elapsed if self.cost is None else self.cost * .8 + elapsed * .2
+            self.cached = result
+        else:
+            self.cached = None
         self.last = n
         if not self.reported:
             changed = float(np.mean([np.abs(dst[::16, ::16].astype(np.int16) -
@@ -27,7 +68,8 @@ class Processor:
                                      for src, dst in zip(source, output)]))
             print("HOST_FRAME " + json.dumps({"processed": processed, "changedMean": changed,
                   "workerPid": self.client.worker_pid, "reused": self.client.reused,
-                  "device": self.client.device}), flush=True)
+                  "device": self.client.device, "adaptive": self.adaptive,
+                  "frameDuration": duration}), flush=True)
             self.reported = True
         return result
 

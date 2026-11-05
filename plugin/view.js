@@ -5,7 +5,7 @@
     close: "关闭", gpu: "处理显卡", loading: "正在检测显卡…", retry: "重试检测", detectionFailed: "显卡检测失败", runtime: "NR 运行时 DLL", browse: "选择 DLL 所在目录",
     style: "风格", standard: "默认", natural: "自然", cinema: "电影", local_tone: "局部色调", local_struct: "局部结构",
     skin_struct: "肤色结构", use_auto_mask: "自动肤色蒙版", applied: "参数已应用",
-    frameRate: "增强帧率上限", sourceRate: "原始帧率",
+    frameRate: "增强帧率上限", sourceRate: "原始帧率（自动适配）", measuredRate: "测速上限", legacyRate: "兼容模式上限：30 FPS",
     modelPreset: "模型预设", modelAuto: "自动识别", modelDefault: "默认（预设 1）", modelSmall: "Small（预设 2）",
     modelDetectedSmall: "已识别 RTX 30 优化运行库，使用 Small 预设 2", modelDetectedDefault: "自动选择默认预设 1",
     sdr: "兼容模式：HDR / 杜比视界转 SDR", output: "增强输出：SDR · 保持原分辨率",
@@ -16,7 +16,7 @@
     close: "Close", gpu: "Processing GPU", loading: "Detecting GPUs…", retry: "Retry detection", detectionFailed: "GPU detection failed", runtime: "NR runtime DLL", browse: "Choose DLL directory",
     style: "Style", standard: "Default", natural: "Natural", cinema: "Cinema", local_tone: "Local tone", local_struct: "Local structure",
     skin_struct: "Skin structure", use_auto_mask: "Automatic skin mask", applied: "Settings applied",
-    frameRate: "Enhancement frame rate limit", sourceRate: "Source frame rate",
+    frameRate: "Enhancement frame rate limit", sourceRate: "Source frame rate (adaptive)", measuredRate: "Calibrated limit", legacyRate: "Compatibility limit: 30 FPS",
     modelPreset: "Model preset", modelAuto: "Automatic", modelDefault: "Default (preset 1)", modelSmall: "Small (preset 2)",
     modelDetectedSmall: "RTX 30 optimized runtime detected: using Small preset 2", modelDetectedDefault: "Automatically selected default preset 1",
     sdr: "Compatibility: HDR / Dolby Vision to SDR", output: "Enhancement output: SDR · Original resolution",
@@ -80,6 +80,11 @@
       const owner = await api.native.call("enhance", "frames.status");
       if (owner.error) throw new Error(owner.error);
       if (owner.device) $("device").textContent = `${owner.device.name} | PCI ${owner.device.pciBusId}\n${owner.device.uuid}`;
+      if (attached && !preferences.frameRateLimit) {
+        const rate = Number(owner.profiledFrameRate);
+        if (owner.profiledFrameRate != null && Number.isFinite(rate)) $("device").textContent += `\n${t.measuredRate}: ${rate.toFixed(1)} FPS`;
+        else if (!api.capabilities.has("native.video.autoFrameRate")) $("device").textContent += `\n${t.legacyRate}`;
+      }
       if (attached && state.filterEnabled && owner.workerPid) $("status").textContent = t.active;
       else if (attached && !state.filterEnabled) throw new Error(t.failed);
     }
@@ -137,7 +142,10 @@
       const recognized = smallPresetRuntimes.has(runtime.sha256.toLowerCase());
       const preset = preferences.modelPreset === "auto" ? (recognized ? 2 : 1) : Number(preferences.modelPreset);
       $("modelDetected").textContent = preferences.modelPreset === "auto" ? (recognized ? t.modelDetectedSmall : t.modelDetectedDefault) : "";
-      await api.native.video.attach("enhance", { inputConversion: preferences.normalizeSdr ? "sdr-bt709" : "none", ...(preferences.frameRateLimit ? { frameRateLimit: preferences.frameRateLimit } : {}), settings: { gpu_uuid: preferences.gpuUuid, preset, ...readSettings() } });
+      const rateOptions = preferences.frameRateLimit ? { frameRateLimit: preferences.frameRateLimit } : {
+        ...(api.capabilities.has("native.video.autoFrameRate") ? { autoFrameRate: true } : { frameRateLimit: 30 }), adaptive: true,
+      };
+      await api.native.video.attach("enhance", { inputConversion: preferences.normalizeSdr ? "sdr-bt709" : "none", ...rateOptions, settings: { gpu_uuid: preferences.gpuUuid, preset, ...readSettings() } });
       for (let attempt = 0; attempt < 20; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 400));
         const owner = await api.native.call("enhance", "frames.status");

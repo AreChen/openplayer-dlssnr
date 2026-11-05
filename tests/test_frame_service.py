@@ -41,6 +41,14 @@ class FrameServiceTests(unittest.TestCase):
         self.assertEqual([event[0] for event in self.events].count("engine-start"), 1)
         self.assertEqual([event[0] for event in self.events].count("engine-close"), 1)
 
+    def test_adaptive_policy_reaches_each_frame_lease(self):
+        with self.service(adaptive=True, playback_speed=2.0) as owner:
+            with FrameClient(owner.endpoint, 64, 32) as client:
+                self.assertIs(client.adaptive, True)
+                self.assertEqual(client.playback_speed, 2.0)
+            with FrameClient(owner.endpoint, 64, 32) as client:
+                self.assertIs(client.adaptive, True)
+
     def test_updates_serialize_with_live_frames(self):
         with self.service() as owner:
             with FrameClient(owner.endpoint, 64, 32) as client:

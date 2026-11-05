@@ -14,7 +14,7 @@ The current host is required; older development hosts lack this API.
 With the prepared CPython 3.12/NumPy environment and native DLL:
 
 ```powershell
-rtk proxy python scripts/build-portable-module.py --vapoursynth .local/python/vapoursynth --host .local/build/dlssnr_host_v2.dll --output .local/plugin-ui --plugin-ui --archive .local/DLSSNR_0.5.0.opplugin
+rtk proxy python scripts/build-portable-module.py --vapoursynth .local/python/vapoursynth --host .local/build/dlssnr_host_v2.dll --output .local/plugin-ui --plugin-ui --archive .local/DLSSNR_0.5.1.opplugin
 ```
 
 Output paths must be new. `--plugin-ui` adds the plugin action, themed side panel,
@@ -115,9 +115,21 @@ typed `frameRateLimit` drops frames before expensive conversion/NR and maintains
 audio speed and media timing. Every delivered frame still undergoes NR; this
 does not alternate enhanced frames with unprocessed source frames. It trades
 motion smoothness for a sustainable workload, not 60 FPS inference on a 19 FPS GPU.
-Choose a cap below sustained end-to-end processing capacity. Source rate can
-still desynchronize when processing cannot keep up; 4K may need a lower rate
-than the current panel offers. No automatic GPU performance selection is claimed.
+Choose a fixed cap below sustained end-to-end processing capacity. From 0.5.1,
+source-rate mode measures capacity at startup on host 1.6.9, with headroom for
+conversion and presentation. The host caps input before expensive conversion
+only when needed. Under additional load the adapter repeats the last enhanced
+frame instead of alternating with unprocessed frames, and resumes processing more
+often when load falls. Re-enable after changing playback speed; the startup limit
+does not increase until the next measurement. On older hosts, source-rate mode
+uses a fixed 30 FPS host cap plus adaptive processing. Measurements are estimates,
+not guarantees of maximum throughput or real-time operation under every load.
+
+`.local/host-v051-preset2-final.json` records a 20-second run of the same video
+with the RTX 30 optimized DLL and Small preset on GPU 1: a 25 FPS measured cap,
+zero video-output drops and peak A/V error below 1 ms.
+`.local/host-v051-preset2-hdr.json` verifies enabling, paused adjustment and
+cleanup with the 4K Dolby Vision sample, not sustained 4K synchronization.
 
 Evidence for the user's 1080p59.94 food video on GPU 1:
 `.local/realtime-1080p60-final.json` records 303 NR frames over 20.21 seconds
@@ -127,9 +139,9 @@ position and worker reuse with the same 15 FPS cap. UI tests include delayed GPU
 enumeration, failed-detection retry without losing the saved UUID, themed select
 popups/checkboxes and measured host chrome/transport avoidance across window sizes.
 
-Rejected experiments: inference-only budgeting still accumulated 3.1 seconds of
-lag; local wall-clock bypass restored sync by starving enhancement. Neither is
-included. The shipped path uses the existing FFmpeg rate filter instead.
+An inference-only prototype still accumulated 3.1 seconds of lag, while a local
+wall-clock bypass starved enhancement. The current adaptive path therefore also
+uses the host's pre-processing FPS cap when the source exceeds measured capacity.
 
 Delivery: `.local/delivery-0.4.0/DLSSNR_0.4.0.opplugin` and the sibling
 `OpenPlayerNRTest/openplayer-desktop.exe` test host. Exit the old player before
