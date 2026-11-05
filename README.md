@@ -36,7 +36,7 @@
 
 ## 更多信息
 
-- [版本说明](docs/releases/v0.5.1.md)
+- [版本说明](docs/releases/v0.6.0.md)
 - [配置、使用细节与兼容性](docs/plugin-ui.md)
 - [开发与测试](docs/development.md)
 - [第三方组件与许可](THIRD_PARTY_NOTICES.md)
