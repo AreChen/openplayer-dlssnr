@@ -50,7 +50,7 @@ function fixture(seed, options) {
         if (f.fail) throw new Error("Simulated attachment failure");
         if (m.args.options.settings.gpu_uuid !== "GPU-1") throw new Error("GPU 0 must not be selected by default");
         if (m.args.options.frameRateLimit !== (options.sourceRate ? (options.legacy ? 30 : undefined) : 15)) throw new Error("expected saved frame rate limit");
-        if (m.args.options.adaptive !== (options.sourceRate ? true : undefined)) throw new Error("incorrect adaptive frame policy");
+        if (m.args.options.adaptive !== true) throw new Error("incorrect adaptive frame policy");
         if (m.args.options.autoFrameRate !== (options.sourceRate && !options.legacy ? true : undefined)) throw new Error("incorrect host calibration request");
         if (m.args.options.settings.preset !== f.expectedPreset) throw new Error("incorrect model preset");
         f.attached = true;
@@ -62,6 +62,7 @@ function fixture(seed, options) {
           return;
         }
         else if (method === "frames.status") result = { workerPid: f.attached ? 123 : null, device: f.attached ? devices[1] : null };
+        else if (method === "frames.speed") { f.speed = m.args.params.speed; result = { speed: f.speed }; }
         else if (method === "frames.update") {
           f.updates = (f.updates || 0) + 1;
           f.settings = m.args.params.settings;
@@ -69,7 +70,8 @@ function fixture(seed, options) {
         }
         else if (method === "runtime.inspect") result = { path: "E:/Runtime/nvngx_dlssnr.dll", sha256: options.runtimeSha || "a".repeat(64) };
         else if (method !== "runtime.configure") throw new Error(`Unexpected native method ${method}`);
-      } else if (!m.command.startsWith("plugin.log.") && m.command !== "ui.closePluginView") throw new Error(`Unexpected command ${m.command}`);
+      } else if (m.command === "player.snapshot") result = { speed: 2 };
+      else if (!m.command.startsWith("plugin.log.") && m.command !== "ui.closePluginView") throw new Error(`Unexpected command ${m.command}`);
     } catch (e) { error = e.message; }
     window.postMessage({ type: "openplayer:viewResponse", pluginId: m.pluginId, requestId: m.requestId, ok: !error, result, error }, "*");
   });
@@ -105,6 +107,7 @@ try {
   await page.waitForFunction(() => window.fixture.preferences?.runtimePath === "E:/Runtime/nvngx_dlssnr.dll");
   await page.locator("#start").click();
   await page.waitForFunction(() => document.getElementById("status").textContent === "增强已开启");
+  assert.equal(await page.evaluate(() => window.fixture.speed), 2);
   assert(await page.locator("#gpu").isDisabled());
   assert(await page.locator("#modelPreset").isDisabled());
   assert.match(await page.locator("#modelDetected").textContent(), /预设 1/);
