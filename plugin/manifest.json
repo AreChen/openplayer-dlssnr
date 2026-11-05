@@ -9,7 +9,10 @@
   "runtime": { "kind": "webviewJs", "entry": "plugin/runtime.js", "sandbox": "openplayer-worker" },
   "contributes": {
     "capabilities": [{ "id": "video", "name": "Native video processing", "kind": "nativeTool", "permissions": ["native.process", "native.video", "filesystem.pick"] }],
-    "actions": [{ "id": "open", "label": "DLSSNR", "placement": "controls.right", "command": "plugin.open-dlssnr", "icon": "settings", "requiresMedia": false }],
+    "actions": [
+      { "id": "open", "label": "DLSSNR", "placement": "controls.right", "command": "plugin.open-dlssnr", "icon": "settings", "requiresMedia": false },
+      { "id": "toggle", "label": "Toggle DLSSNR", "labelI18n": { "zh-CN": "开关 DLSSNR 增强" }, "placement": "contextMenu", "command": "plugin.toggle-dlssnr", "icon": "settings", "requiresMedia": false }
+    ],
     "views": [{ "id": "enhance", "title": "DLSSNR", "presentation": "sidePanel", "entry": "plugin/view.html" }],
     "storage": { "version": 1, "defaults": { "preferences": { "gpuUuid": "", "runtimePath": "", "normalizeSdr": true, "style": 0, "intensity": 0.5, "local_tone": 1, "local_struct": 1, "skin_struct": 0.5, "use_auto_mask": false } } }
   }

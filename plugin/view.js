@@ -181,6 +181,7 @@
     if (busy) return;
     busy = true;
     refresh().catch(async (error) => {
+      if (/native (?:module|video operation) is busy/i.test(String(error.message || error))) return;
       $("error").textContent = String(error.message || error);
       await api.native.stop("enhance").catch(() => {});
       running = false; attached = false;
