@@ -1,7 +1,7 @@
 "use strict";
 openplayer.commands.register("plugin.open-dlssnr", async () => {
   if (!openplayer.capabilities.has("native.video")) {
-    await openplayer.ui.toast("DLSSNR requires the OpenPlayer native.video development host.");
+    await openplayer.ui.toast("DLSSNR requires OpenPlayer 1.6.10 or newer.");
     return;
   }
   await openplayer.ui.openView("enhance");
@@ -30,6 +30,28 @@ openplayer.commands.register("plugin.open-dlssnr", async () => {
       }
     }
   }
+  let latestSpeed = 1, lastObservedSpeed = null, syncingSpeed = false;
+  async function syncSpeed() {
+    if (syncingSpeed) return;
+    syncingSpeed = true;
+    try {
+      let sent;
+      do {
+        sent = latestSpeed;
+        const state = await api.native.video.status("enhance");
+        if (state.attached) await retryBusy(() => api.native.call("enhance", "frames.speed", { speed: sent }));
+      } while (sent !== latestSpeed);
+    } catch (error) {
+      await api.log.error(String(error?.message || error)).catch(() => {});
+    } finally { syncingSpeed = false; }
+  }
+  api.onReady(() => api.events.subscribe("playback.snapshot"));
+  api.onEvent((event, snapshot) => {
+    const speed = snapshot?.speed;
+    if (event !== "playback.snapshot" || !Number.isFinite(speed) || speed <= 0 || speed > 100 || speed === lastObservedSpeed) return;
+    lastObservedSpeed = latestSpeed = speed;
+    void syncSpeed();
+  });
   let toggling = false;
   async function toggle() {
     if (!api.capabilities.has("native.video")) throw new Error(text.failed);
@@ -42,7 +64,8 @@ openplayer.commands.register("plugin.open-dlssnr", async () => {
     const preferences = { gpuUuid: "", runtimePath: "", modelPreset: "auto", normalizeSdr: true, frameRateLimit: 15,
       ...defaults, ...await api.storage.get("preferences") };
     if (!preferences.gpuUuid || !preferences.runtimePath) throw new Error(text.configure);
-    if (!(await api.media.snapshot())?.path) throw new Error(text.noMedia);
+    const media = await api.media.snapshot();
+    if (!media?.path) throw new Error(text.noMedia);
     let attachedByUs = false, started = false;
     try {
       await retryBusy(() => api.native.start("enhance"));
@@ -54,7 +77,7 @@ openplayer.commands.register("plugin.open-dlssnr", async () => {
       const modelPreset = ["auto", "1", "2"].includes(preferences.modelPreset) ? preferences.modelPreset : "auto";
       const preset = modelPreset === "auto" ? (runtime.sha256.toLowerCase() === smallRuntime ? 2 : 1) : Number(modelPreset);
       const rate = [0, 10, 15, 20, 24, 30].includes(preferences.frameRateLimit) ? preferences.frameRateLimit : 15;
-      const rateOptions = rate ? { frameRateLimit: rate } : {
+      const rateOptions = rate ? { frameRateLimit: rate, adaptive: true } : {
         ...(api.capabilities.has("native.video.autoFrameRate") ? { autoFrameRate: true } : { frameRateLimit: 30 }), adaptive: true,
       };
       const settings = Object.fromEntries(Object.entries(defaults).map(([key, fallback]) => [key,
@@ -62,6 +85,9 @@ openplayer.commands.register("plugin.open-dlssnr", async () => {
       await retryBusy(() => api.native.video.attach("enhance", { inputConversion: preferences.normalizeSdr !== false ? "sdr-bt709" : "none",
         ...rateOptions, settings: { gpu_uuid: preferences.gpuUuid, preset, ...settings } }));
       attachedByUs = true;
+      const current = await api.media.snapshot();
+      const speed = Number.isFinite(current?.speed) && current.speed > 0 && current.speed <= 100 ? current.speed : 1;
+      await retryBusy(() => api.native.call("enhance", "frames.speed", { speed }));
       for (let attempt = 0; attempt < 20; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 400));
         const owner = await retryBusy(() => api.native.call("enhance", "frames.status"));

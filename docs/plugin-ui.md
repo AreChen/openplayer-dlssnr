@@ -1,7 +1,7 @@
 # Build and test the development plugin
 
-**Requires OpenPlayer 1.6.4, Windows x64 and a compatible NVIDIA GPU.**
-OpenPlayer 1.6.3 is insufficient. This is experimental SDR processing up to 3840x2160,
+**Requires OpenPlayer 1.6.10, Windows x64 and a compatible NVIDIA GPU.**
+This is experimental SDR processing up to 3840x2160,
 with optional HDR/Dolby Vision input conversion to SDR. It is not HDR passthrough
 or a claim of real-time 4K playback. Update the host as well as the plugin.
 
@@ -14,7 +14,7 @@ The current host is required; older development hosts lack this API.
 With the prepared CPython 3.12/NumPy environment and native DLL:
 
 ```powershell
-rtk proxy python scripts/build-portable-module.py --vapoursynth .local/python/vapoursynth --host .local/build/dlssnr_host_v2.dll --output .local/plugin-ui --plugin-ui --archive .local/DLSSNR_0.5.1.opplugin
+rtk proxy python scripts/build-portable-module.py --vapoursynth .local/python/vapoursynth --host .local/build/dlssnr_host_v2.dll --output .local/plugin-ui --plugin-ui --archive .local/DLSSNR_0.6.0.opplugin
 ```
 
 Output paths must be new. `--plugin-ui` adds the plugin action, themed side panel,
@@ -112,17 +112,17 @@ the exact seek re-filters the paused position instead of waiting for playback.
 Version 0.4.0 defaults to a 15 FPS enhancement cap, saved separately from NR
 settings. Choose 10, 15, 20, 24, 30 or source rate before enabling. The host's
 typed `frameRateLimit` drops frames before expensive conversion/NR and maintains
-audio speed and media timing. Every delivered frame still undergoes NR; this
-does not alternate enhanced frames with unprocessed source frames. It trades
+audio speed and media timing. Under load the adapter repeats the last enhanced
+frame rather than alternating with unprocessed source frames. It trades
 motion smoothness for a sustainable workload, not 60 FPS inference on a 19 FPS GPU.
 Choose a fixed cap below sustained end-to-end processing capacity. From 0.5.1,
 source-rate mode measures capacity at startup on host 1.6.9, with headroom for
 conversion and presentation. The host caps input before expensive conversion
 only when needed. Under additional load the adapter repeats the last enhanced
 frame instead of alternating with unprocessed frames, and resumes processing more
-often when load falls. Re-enable after changing playback speed; the startup limit
-does not increase until the next measurement. On older hosts, source-rate mode
-uses a fixed 30 FPS host cap plus adaptive processing. Measurements are estimates,
+often when load falls. Both fixed and automatic limits adapt inference cadence
+to playback speed changes; the startup limit does not increase until the next
+measurement. Measurements are estimates,
 not guarantees of maximum throughput or real-time operation under every load.
 
 `.local/host-v051-preset2-final.json` records a 20-second run of the same video

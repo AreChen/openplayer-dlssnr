@@ -7,10 +7,13 @@ const source = await readFile(new URL("../plugin/runtime.js", import.meta.url), 
 const flush = async () => { for (let i = 0; i < 10; i++) await new Promise(setImmediate); };
 function setup(preferences = {}) {
   const handlers = {}, calls = [], toasts = [];
+  let onEvent, onReady;
   let attached = false;
   const runtime = { path: "nr.dll", sha256: "749daadb43f11b2fc0bf39d92a67809978f27b9e96150b631d50fc8d1ec9e3ca" };
   const api = {
     locale: "en", commands: { register: (name, handler) => { handlers[name] = handler; } },
+    onEvent: (handler) => { onEvent = handler; }, onReady: (handler) => { onReady = handler; },
+    events: { subscribe: async (name) => { calls.push(["subscribe", name]); } },
     capabilities: { has: () => true },
     media: { snapshot: async () => ({ path: "video.mp4" }) },
     storage: { get: async () => ({ gpuUuid: "gpu1", runtimePath: "nr.dll", modelPreset: "auto", frameRateLimit: 0, ...preferences }) },
@@ -33,7 +36,7 @@ function setup(preferences = {}) {
     },
   };
   vm.runInNewContext(source, { openplayer: api, setTimeout: (fn) => { fn(); return 0; } });
-  return { handlers, calls, toasts };
+  return { handlers, calls, toasts, event: (...args) => onEvent?.(...args), ready: () => onReady?.() };
 }
 
 test("shortcut toggles NR without an open panel and preserves model and adaptive settings", async () => {
@@ -56,4 +59,20 @@ test("shortcut reports missing configuration without starting a module", async (
   await flush();
   assert.equal(calls.length, 0);
   assert.ok(toasts.length);
+});
+
+test("playback speed changes update the active frame owner", async () => {
+  const { handlers, calls, event, ready } = setup({ frameRateLimit: 30 });
+  assert.equal(typeof ready(), "object");
+  handlers["plugin.toggle-dlssnr"]();
+  await flush();
+  const attach = calls.find(([name]) => name === "attach")[1];
+  assert.equal(attach.adaptive, true);
+  const before = calls.filter(([name]) => name === "frames.speed").length;
+  event("playback.snapshot", { speed: 2 });
+  await flush();
+  assert.equal(calls.filter(([name]) => name === "frames.speed").length, before + 1);
+  event("playback.snapshot", { speed: 2 });
+  await flush();
+  assert.equal(calls.filter(([name]) => name === "frames.speed").length, before + 1);
 });

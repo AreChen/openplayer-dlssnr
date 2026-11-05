@@ -109,6 +109,25 @@ class HostAdapterTests(unittest.TestCase):
                 processor.process(n=n, f=frame)
             self.assertLess(client.process_into.call_count, 40)
 
+    def test_adaptive_rate_follows_later_playback_speed_changes(self):
+        client = Mock(worker_pid=1, reused=False, device=None, adaptive=True, playback_speed=1.0)
+        client.process_into.return_value = True
+        ticks = iter(value for n in range(300) for value in (n, n + .02))
+        with patch.object(self.adapter, "FrameClient", return_value=client), \
+                patch.object(self.adapter.time, "perf_counter", side_effect=lambda: next(ticks)), \
+                patch("builtins.print"):
+            processor = self.adapter.Processor(SimpleNamespace(width=16, height=16), {})
+            frame = Frame()
+            frame.props["_DurationDen"] = 30
+            for n in range(60):
+                processor.process(n=n, f=frame)
+            first = client.process_into.call_count
+            client.playback_speed = 2.0
+            for n in range(60, 120):
+                processor.process(n=n, f=frame)
+            second = client.process_into.call_count - first
+            self.assertGreater(first, second * 1.5)
+
     def test_adaptive_rate_recovers_after_a_temporary_slowdown(self):
         client = Mock(worker_pid=1, reused=False, device=None, adaptive=True, playback_speed=1.0)
         client.process_into.return_value = True

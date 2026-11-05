@@ -101,6 +101,11 @@ class FrameModule:
             if self.profiled_frame_rate is not None:
                 result["frameRateLimit"] = self.profiled_frame_rate
             return result
+        if method == "frames.speed":
+            if set(params) != {"speed"} or self.owner is None:
+                raise ValueError("open the frame owner before updating playback speed")
+            self.owner.set_playback_speed(params["speed"])
+            return {"speed": self.owner.playback_speed}
         if method == "frames.update":
             try:
                 if set(params) != {"settings"} or not params["settings"]:

@@ -33,6 +33,14 @@
   const parameters = Object.keys(defaults);
   let preferences = { gpuUuid: "", runtimePath: "", modelPreset: "auto", normalizeSdr: true, frameRateLimit: 15, ...defaults };
   let pending = false, updateTimer;
+  async function retryBusy(work) {
+    for (let attempt = 0; ; attempt++) {
+      try { return await work(); } catch (error) {
+        if (!/native (?:module|video operation) is busy/i.test(String(error.message || error)) || attempt >= 119) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+  }
   function readSettings() {
     return Object.fromEntries(parameters.map((key) => [key, key === "use_auto_mask" ? $(key).checked : Number($(key).value)]));
   }
@@ -142,10 +150,13 @@
       const recognized = smallPresetRuntimes.has(runtime.sha256.toLowerCase());
       const preset = preferences.modelPreset === "auto" ? (recognized ? 2 : 1) : Number(preferences.modelPreset);
       $("modelDetected").textContent = preferences.modelPreset === "auto" ? (recognized ? t.modelDetectedSmall : t.modelDetectedDefault) : "";
-      const rateOptions = preferences.frameRateLimit ? { frameRateLimit: preferences.frameRateLimit } : {
+      const rateOptions = preferences.frameRateLimit ? { frameRateLimit: preferences.frameRateLimit, adaptive: true } : {
         ...(api.capabilities.has("native.video.autoFrameRate") ? { autoFrameRate: true } : { frameRateLimit: 30 }), adaptive: true,
       };
       await api.native.video.attach("enhance", { inputConversion: preferences.normalizeSdr ? "sdr-bt709" : "none", ...rateOptions, settings: { gpu_uuid: preferences.gpuUuid, preset, ...readSettings() } });
+      const media = await api.media.snapshot();
+      const speed = Number.isFinite(media?.speed) && media.speed > 0 && media.speed <= 100 ? media.speed : 1;
+      await retryBusy(() => api.native.call("enhance", "frames.speed", { speed }));
       for (let attempt = 0; attempt < 20; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 400));
         const owner = await api.native.call("enhance", "frames.status");

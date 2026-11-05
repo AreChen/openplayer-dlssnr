@@ -38,6 +38,9 @@ class Processor:
             raise ValueError("HDR is not supported by this SDR adapter")
         reset = self.last is None or n != self.last + 1
         duration = self._duration(frame)
+        speed = getattr(self.client, "playback_speed", self.playback_speed)
+        if type(speed) in (int, float) and math.isfinite(speed) and speed > 0:
+            self.playback_speed = speed
         if self.adaptive and not reset and self.cached is not None and self.cost and duration:
             # Match the startup calibration budget, leaving time for the host pipeline.
             self.phase += min(1.0, duration * .6 / (self.cost * self.playback_speed))

@@ -99,6 +99,22 @@ class NativeProtocolTests(unittest.TestCase):
                 module.call("frames.open", {"adaptive": True, "frameRateProbe": probe})
         self.assertIsNone(module.owner)
 
+    def test_speed_updates_reach_a_live_client_and_validate_the_rpc(self):
+        module = FrameModule({}, factory=FakeProcessor)
+        try:
+            with self.assertRaises(ValueError):
+                module.call("frames.speed", {"speed": 2})
+            reply = module.call("frames.open", {"adaptive": True})
+            with FrameClient(reply["endpoint"], 64, 32) as client:
+                self.assertEqual(module.call("frames.speed", {"speed": 2}), {"speed": 2.0})
+                client.process(np.full((32, 64, 4), 100, np.uint8))
+                self.assertEqual(client.playback_speed, 2.0)
+                for params in ({}, {"speed": True}, {"speed": 0}, {"speed": 2, "extra": 1}):
+                    with self.subTest(params=params), self.assertRaises(ValueError):
+                        module.call("frames.speed", params)
+        finally:
+            module.close()
+
     @unittest.skipUnless(sys.platform == "win32", "Windows windowless runtime")
     def test_windowless_worker(self):
         executable = multiprocessing.spawn.get_executable()

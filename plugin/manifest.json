@@ -1,17 +1,17 @@
 {
   "id": "dev.openplayer.dlssnr.portable",
   "name": "DLSSNR",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "apiVersion": "1",
-  "minHostVersion": "1.6.4",
+  "minHostVersion": "1.6.10",
   "entry": "manifest",
-  "description": "Experimental NR with model preset selection, live controls and selectable processing cadence. Requires OpenPlayer 1.6.4 on Windows x64.",
-  "runtime": { "kind": "webviewJs", "entry": "plugin/runtime.js", "sandbox": "openplayer-worker" },
+  "description": "Experimental NR with live controls, configurable shortcuts and selectable processing cadence. Requires OpenPlayer 1.6.10 on Windows x64.",
+  "runtime": { "kind": "webviewJs", "entry": "plugin/runtime.js", "sandbox": "openplayer-worker", "events": ["playback.snapshot"] },
   "contributes": {
     "capabilities": [{ "id": "video", "name": "Native video processing", "kind": "nativeTool", "permissions": ["native.process", "native.video", "filesystem.pick"] }],
     "actions": [
-      { "id": "open", "label": "DLSSNR", "placement": "controls.right", "command": "plugin.open-dlssnr", "icon": "settings", "requiresMedia": false },
-      { "id": "toggle", "label": "Toggle DLSSNR", "labelI18n": { "zh-CN": "开关 DLSSNR 增强" }, "placement": "contextMenu", "command": "plugin.toggle-dlssnr", "icon": "settings", "requiresMedia": false }
+      { "id": "open", "label": "DLSSNR", "placement": "controls.right", "command": "plugin.open-dlssnr", "icon": "sparkles", "requiresMedia": false },
+      { "id": "toggle", "label": "Toggle DLSSNR", "labelI18n": { "zh-CN": "开关 DLSSNR 增强" }, "placement": "contextMenu", "command": "plugin.toggle-dlssnr", "icon": "sparkles", "requiresMedia": false }
     ],
     "views": [{ "id": "enhance", "title": "DLSSNR", "presentation": "sidePanel", "entry": "plugin/view.html" }],
     "storage": { "version": 1, "defaults": { "preferences": { "gpuUuid": "", "runtimePath": "", "normalizeSdr": true, "style": 0, "intensity": 0.5, "local_tone": 1, "local_struct": 1, "skin_struct": 0.5, "use_auto_mask": false } } }

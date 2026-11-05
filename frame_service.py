@@ -107,7 +107,8 @@ class FrameService:
                     processed = self.session.process_shared(reset=reset)
                     self.processed_frames += int(processed)
                 send_message(connection, {"generation": self.generation, "sequence": sequence,
-                                           "processed": processed, "fallback": self.session.error})
+                                           "processed": processed, "fallback": self.session.error,
+                                           "playback_speed": self.playback_speed})
         finally:
             self.log("detach", generation=self.generation, engine=self.engine, frames=sequence)
 
@@ -144,6 +145,11 @@ class FrameService:
                     self._close_session()
             except Exception as error:
                 self.error = error
+
+    def set_playback_speed(self, speed):
+        if type(speed) not in (int, float) or not math.isfinite(speed) or not .01 <= speed <= 100:
+            raise ValueError("invalid adaptive playback speed")
+        self.playback_speed = float(speed)
 
     def update(self, settings):
         # Serialize control RPC with frame IPC; never interleave pipe replies.

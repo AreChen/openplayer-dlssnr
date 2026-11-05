@@ -49,6 +49,18 @@ class FrameServiceTests(unittest.TestCase):
             with FrameClient(owner.endpoint, 64, 32) as client:
                 self.assertIs(client.adaptive, True)
 
+    def test_playback_speed_changes_reach_active_and_new_leases(self):
+        with self.service(adaptive=True) as owner:
+            with FrameClient(owner.endpoint, 64, 32) as client:
+                owner.set_playback_speed(2.0)
+                client.process(self.frame)
+                self.assertEqual(client.playback_speed, 2.0)
+                for value in (0, -1, float("nan"), 101, "2", True):
+                    with self.assertRaises(ValueError):
+                        owner.set_playback_speed(value)
+            with FrameClient(owner.endpoint, 64, 32) as client:
+                self.assertEqual(client.playback_speed, 2.0)
+
     def test_updates_serialize_with_live_frames(self):
         with self.service() as owner:
             with FrameClient(owner.endpoint, 64, 32) as client:

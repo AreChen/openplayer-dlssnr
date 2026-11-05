@@ -98,6 +98,10 @@ class FrameClient:
                 raise ProcessorError("stale or invalid frame reply")
             if not reply["processed"]:
                 raise ProcessorError(reply.get("fallback") or "frame processor failed")
+            speed = reply.get("playback_speed", self.playback_speed)
+            if type(speed) not in (int, float) or not math.isfinite(speed) or not .01 <= speed <= 100:
+                raise ProcessorError("invalid adaptive playback speed")
+            self.playback_speed = speed
             return True
         except (OSError, EOFError, ValueError, ProcessorError) as error:
             self.error = str(error)
