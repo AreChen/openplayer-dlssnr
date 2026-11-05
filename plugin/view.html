@@ -34,6 +34,7 @@
     <main>
       <div class="field"><label for="gpu" data-text="gpu"></label><select id="gpu" class="op-select"></select><button id="retry" class="op-button" data-text="retry" hidden></button></div>
       <div class="field"><label for="runtime" data-text="runtime"></label><input id="runtime" class="op-input" spellcheck="false" placeholder="nvngx_dlssnr.dll"><button id="browse" class="op-button" data-text="browse"></button></div>
+      <div class="field"><label for="modelPreset" data-text="modelPreset"></label><select id="modelPreset" class="op-select"><option value="auto" data-text="modelAuto"></option><option value="1" data-text="modelDefault"></option><option value="2" data-text="modelSmall"></option></select><div id="modelDetected" class="op-muted" role="status"></div></div>
       <label class="row"><input id="normalizeSdr" class="op-checkbox" type="checkbox" checked><span data-text="sdr"></span></label>
       <div class="op-muted" data-text="output"></div>
       <div class="field"><label for="frameRateLimit" data-text="frameRate"></label><select id="frameRateLimit" class="op-select"><option value="10">10 FPS</option><option value="15">15 FPS</option><option value="20">20 FPS</option><option value="24">24 FPS</option><option value="30">30 FPS</option><option value="0" data-text="sourceRate"></option></select></div>

@@ -147,6 +147,8 @@ class FrameService:
             current = self.options.get("settings", {})
             if settings.get("gpu_uuid", current.get("gpu_uuid")) != current.get("gpu_uuid"):
                 raise ValueError("stop enhancement before selecting another GPU")
+            if settings.get("preset", current.get("preset", 1)) != current.get("preset", 1):
+                raise ValueError("stop enhancement before changing model preset")
             if self.session is not None:
                 self.session.update(settings)
             self.options = {**self.options, "settings": {**current, **settings}}

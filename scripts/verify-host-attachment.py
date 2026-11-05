@@ -26,6 +26,7 @@ def main():
     parser.add_argument("--seek", type=float, default=.2, help="actual in-file seek position for scene inspection")
     parser.add_argument("--runtime", required=True, type=Path)
     parser.add_argument("--gpu", required=True, help="explicit NVIDIA GPU UUID; never a display ordinal")
+    parser.add_argument("--preset", type=int, choices=[1, 2], default=1, help="DLSSNR model preset")
     parser.add_argument("--report", required=True, type=Path)
     parser.add_argument("--scenario", action="append", choices=["stop", "disable", "upgrade", "uninstall", "crash", "app-exit", "media-change", "detach"])
     args = parser.parse_args()
@@ -43,7 +44,7 @@ def main():
     environment.update(PYTHONPATH="Z:/unused-python-path", PYTHONHOME="Z:/unused-python-home",
                        OPENPLAYER_SMOKE_MEDIA=str(args.video.resolve(strict=True)),
                        OPENPLAYER_SMOKE_RUNTIME_BUNDLE=str(bundle),
-                       OPENPLAYER_SMOKE_FRAME_OPTIONS=json.dumps({"inputConversion": "sdr-bt709" if args.normalize_sdr else "none", "settings": {"gpu_uuid": args.gpu, "intensity": .5}}),
+                       OPENPLAYER_SMOKE_FRAME_OPTIONS=json.dumps({"inputConversion": "sdr-bt709" if args.normalize_sdr else "none", "settings": {"gpu_uuid": args.gpu, "preset": args.preset, "intensity": .5}}),
                        OPENPLAYER_SMOKE_NVIDIA_RUNTIME=str(args.runtime.resolve(strict=True)))
     if args.frame_rate_limit is not None:
         options = json.loads(environment["OPENPLAYER_SMOKE_FRAME_OPTIONS"])
@@ -68,7 +69,7 @@ def main():
             print(f"RUN: {action}", flush=True)
             result = subprocess.run([str(ROOT / ".local/build/mpv_frame_probe.exe"), "--run",
                 str(args.window_smoke.resolve(strict=True)), "overlay-alt-f4"],
-                cwd=work, env=environment, timeout=40, capture_output=True,
+                cwd=work, env=environment, timeout=75 if args.realtime else 40, capture_output=True,
                 creationflags=subprocess.CREATE_NO_WINDOW)
             entry = {"action": action, "exitCode": result.returncode,
                      "elapsedSeconds": round(time.monotonic() - started, 3),

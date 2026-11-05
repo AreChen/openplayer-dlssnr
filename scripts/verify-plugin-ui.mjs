@@ -31,7 +31,7 @@ const { buildPluginViewDocument } = load(path.join(host, "src/app/pluginRuntime/
 const template = fs.readFileSync("plugin/view.html", "utf8"), script = fs.readFileSync("plugin/view.js", "utf8");
 const theme = { surface: "#141618", panel: "#202326", panelStrong: "#292d31", text: "#f0f2f4", muted: "#b0b7bf", faint: "#7c858e", accent: "#62c5ac", danger: "#e47777", line: "#3d444b", control: "#30363c" };
 function fixture(seed, options) {
-  window.fixture = { calls: [], preferences: seed, running: false, attached: false, fail: false, failDevices: options.failDevices };
+  window.fixture = { calls: [], preferences: seed, running: false, attached: false, fail: false, failDevices: options.failDevices, expectedPreset: options.expectedPreset ?? 1 };
   const devices = [{ uuid: "GPU-0", name: "NVIDIA GeForce RTX 3080 Ti", pciBusId: "0000:01:00.0" }, { uuid: "GPU-1", name: "NVIDIA GeForce RTX 3080 Ti", pciBusId: "0000:07:00.0" }];
   window.addEventListener("message", ({ data: m }) => {
     if (m.type !== "openplayer:viewRequest") return;
@@ -49,6 +49,7 @@ function fixture(seed, options) {
         if (f.fail) throw new Error("Simulated attachment failure");
         if (m.args.options.settings.gpu_uuid !== "GPU-1") throw new Error("GPU 0 must not be selected by default");
         if (m.args.options.frameRateLimit !== 15) throw new Error("expected saved frame rate limit");
+        if (m.args.options.settings.preset !== f.expectedPreset) throw new Error("incorrect model preset");
         f.attached = true;
       } else if (m.command === "native.call") {
         const { method } = m.args;
@@ -63,7 +64,7 @@ function fixture(seed, options) {
           f.settings = m.args.params.settings;
           result = { applied: true, revision: f.updates, settings: f.settings };
         }
-        else if (method === "runtime.inspect") result = { path: "E:/Runtime/nvngx_dlssnr.dll", sha256: "a".repeat(64) };
+        else if (method === "runtime.inspect") result = { path: "E:/Runtime/nvngx_dlssnr.dll", sha256: options.runtimeSha || "a".repeat(64) };
         else if (method !== "runtime.configure") throw new Error(`Unexpected native method ${method}`);
       } else if (!m.command.startsWith("plugin.log.") && m.command !== "ui.closePluginView") throw new Error(`Unexpected command ${m.command}`);
     } catch (e) { error = e.message; }
@@ -96,6 +97,8 @@ try {
   await page.locator("#start").click();
   await page.waitForFunction(() => document.getElementById("status").textContent === "增强已开启");
   assert(await page.locator("#gpu").isDisabled());
+  assert(await page.locator("#modelPreset").isDisabled());
+  assert.match(await page.locator("#modelDetected").textContent(), /预设 1/);
   assert(await page.locator("#intensity").isEnabled());
   const starts = await page.evaluate(() => window.fixture.calls.filter(c => c.command === "native.start").length);
   await page.locator("#intensity").fill("2.5");
@@ -112,6 +115,30 @@ try {
   const saved = await page.evaluate(() => window.fixture.preferences);
   assert.equal(saved.gpuUuid, "GPU-1");
   assert.equal(saved.frameRateLimit, 15);
+  await page.locator("#stop").click();
+  await page.waitForFunction(() => !window.fixture.running && !document.getElementById("start").disabled);
+  await page.setContent(document("zh-CN", saved, {
+    runtimeSha: "749daadb43f11b2fc0bf39d92a67809978f27b9e96150b631d50fc8d1ec9e3ca",
+    expectedPreset: 2,
+  }));
+  await page.waitForFunction(() => !document.getElementById("gpu").disabled);
+  await page.locator("#start").click();
+  await page.waitForFunction(() => document.getElementById("status").textContent === "增强已开启");
+  assert.match(await page.locator("#modelDetected").textContent(), /Small.*2/);
+  await page.locator("#stop").click();
+  await page.waitForFunction(() => !window.fixture.running && !document.getElementById("start").disabled);
+  await page.locator("#modelPreset").selectOption("1");
+  await page.waitForFunction(() => window.fixture.preferences.modelPreset === "1");
+  await page.evaluate(() => { window.fixture.expectedPreset = 1; });
+  await page.locator("#start").click();
+  await page.waitForFunction(() => document.getElementById("status").textContent === "增强已开启");
+  await page.locator("#stop").click();
+  await page.waitForFunction(() => !window.fixture.running && !document.getElementById("start").disabled);
+  await page.setContent(document("en-US", { ...saved, modelPreset: "2" }, { expectedPreset: 2 }));
+  await page.waitForFunction(() => !document.getElementById("gpu").disabled);
+  assert.equal(await page.locator("#modelPreset").inputValue(), "2");
+  await page.locator("#start").click();
+  await page.waitForFunction(() => document.getElementById("status").textContent === "Enhancement active");
   await page.locator("#stop").click();
   await page.waitForFunction(() => !window.fixture.running && !document.getElementById("start").disabled);
   await page.setContent(document("en-US", saved));

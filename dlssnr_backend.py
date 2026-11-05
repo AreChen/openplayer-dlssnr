@@ -8,12 +8,15 @@ from gpu_devices import normalize_uuid, resolve_device
 
 
 def validate_settings(settings):
-    supported = {"style", "intensity", "local_tone", "local_struct", "skin_struct", "use_auto_mask", "gpu_uuid"}
+    supported = {"style", "intensity", "local_tone", "local_struct", "skin_struct", "use_auto_mask", "gpu_uuid", "preset"}
     if not isinstance(settings, dict) or set(settings) - supported:
         raise ValueError("unsupported DLSSNR setting")
     for key, value in settings.items():
         if key == "gpu_uuid":
             normalize_uuid(value)
+        elif key == "preset":
+            if type(value) is not int or value not in (1, 2):
+                raise ValueError("preset must be 1 or 2")
         elif key == "style":
             if type(value) is not int or value not in (0, 1, 2):
                 raise ValueError("style must be 0, 1 or 2")

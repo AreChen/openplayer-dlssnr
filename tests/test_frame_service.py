@@ -56,6 +56,16 @@ class FrameServiceTests(unittest.TestCase):
                 self.assertEqual(client.process(self.frame)[0, 0, 0], 110)
                 self.assertIsNone(client.error)
 
+    def test_model_preset_change_requires_new_frame_owner(self):
+        with self.service(options={"settings": {"preset": 2}}) as owner:
+            with FrameClient(owner.endpoint, 64, 32) as client:
+                client.process(self.frame)
+                with self.assertRaisesRegex(ValueError, "preset"):
+                    owner.update({"preset": 1})
+                self.assertEqual(owner.options["settings"]["preset"], 2)
+                self.assertEqual(owner.update({"intensity": 1})["revision"], 1)
+                self.assertIsNone(client.error)
+
     def test_format_change_replaces_instead_of_accumulating_workers(self):
         with self.service() as owner:
             for width in (64, 80, 64):

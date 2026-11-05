@@ -14,7 +14,7 @@ The current host is required; older development hosts lack this API.
 With the prepared CPython 3.12/NumPy environment and native DLL:
 
 ```powershell
-rtk proxy python scripts/build-portable-module.py --vapoursynth .local/python/vapoursynth --host .local/build/dlssnr_host_v2.dll --output .local/plugin-ui --plugin-ui --archive .local/DLSSNR_0.4.0.opplugin
+rtk proxy python scripts/build-portable-module.py --vapoursynth .local/python/vapoursynth --host .local/build/dlssnr_host_v2.dll --output .local/plugin-ui --plugin-ui --archive .local/DLSSNR_0.5.0.opplugin
 ```
 
 Output paths must be new. `--plugin-ui` adds the plugin action, themed side panel,
@@ -92,8 +92,11 @@ or dedicated tests. The plugin does not expose interpolation or super-resolution
 Style (default/natural/cinema), intensity, local tone, local structure, automatic
 skin mask and skin structure are exposed. Numeric NR strengths accept 0..5,
 matching the pinned engine; skin structure is enabled when the mask is enabled.
-GPU/runtime changes require stopping enhancement. No inert depth, motion-vector,
-DLSS preset or upscaling controls are presented as working NR settings.
+GPU, runtime and model preset changes require stopping enhancement. Automatic
+selection recognizes the published RTX 30 optimized 0.4.0 runtime by SHA256
+and uses Small preset 2; unrecognized runtimes retain preset 1. Presets can
+also be selected manually. No inert depth, motion-vector or upscaling controls
+are presented as working NR settings.
 
 `frames.update({settings: patch})` returns `applied`, `revision`, and effective
 settings after the worker acknowledges the update. Invalid controls return an
